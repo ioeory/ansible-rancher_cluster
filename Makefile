@@ -155,9 +155,42 @@ test: ## 干跑测试 (不实际执行)
 
 clean: ## 清理临时文件
 	@echo "$(BLUE)清理临时文件...$(NC)"
-	find . -type f -name "*.retry" -delete
-	find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+	@find . -type f -name "*.retry" -delete
+	@find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+	@find . -type f -name "*.log" -delete 2>/dev/null || true
+	@rm -f /tmp/*-token.txt 2>/dev/null || true
 	@echo "$(GREEN)✓ 清理完成$(NC)"
+
+reset: ## 重置仓库到初始状态（删除所有本地配置）
+	@echo "$(RED)========================================$(NC)"
+	@echo "$(RED)  警告: 此操作将删除所有本地配置！$(NC)"
+	@echo "$(RED)========================================$(NC)"
+	@echo ""
+	@echo "$(YELLOW)将删除以下文件:$(NC)"
+	@echo "  • inventory/hosts.ini"
+	@echo "  • inventory/group_vars/all.yml"
+	@echo "  • 所有临时文件和日志"
+	@echo ""
+	@read -p "确认重置? 输入 'yes' 继续: " confirm; \
+	if [ "$$confirm" = "yes" ]; then \
+		echo "$(BLUE)开始清理...$(NC)"; \
+		rm -f inventory/hosts.ini && echo "$(GREEN)✓ 删除 inventory/hosts.ini$(NC)"; \
+		rm -f inventory/group_vars/all.yml && echo "$(GREEN)✓ 删除 inventory/group_vars/all.yml$(NC)"; \
+		find . -type f -name "*.retry" -delete; \
+		find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true; \
+		find . -type f -name "*.log" -delete 2>/dev/null || true; \
+		rm -f /tmp/*-token.txt 2>/dev/null || true; \
+		echo ""; \
+		echo "$(GREEN)========================================$(NC)"; \
+		echo "$(GREEN)  ✓ 仓库已重置到初始状态$(NC)"; \
+		echo "$(GREEN)========================================$(NC)"; \
+		echo ""; \
+		echo "$(YELLOW)下一步:$(NC)"; \
+		echo "  1. 运行 $(GREEN)make setup$(NC) 重新初始化配置"; \
+		echo "  2. 或使用 $(GREEN)git status$(NC) 检查状态"; \
+	else \
+		echo "$(YELLOW)已取消$(NC)"; \
+	fi
 
 setup: ## 初始化配置文件
 	@echo "$(BLUE)========================================$(NC)"
