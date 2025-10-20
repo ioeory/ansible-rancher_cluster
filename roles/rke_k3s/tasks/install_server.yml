@@ -1,0 +1,174 @@
+---
+# Server 节点安装任务
+
+- name: 显示 Server 安装信息
+  debug:
+    msg:
+      - "=========================================="
+      - "开始安装 {{ cluster_type | upper }} Server 节点"
+      - "集群初始化: {{ cluster_init }}"
+      - "Server URL: {{ server_url | default('N/A', true) }}"
+      - "=========================================="
+
+- name: 验证配置 (非初始节点)
+  assert:
+    that:
+      - server_url is defined
+      - server_url | length > 0
+      - cluster_token is defined
+      - cluster_token | length > 0
+    fail_msg: "非初始节点必须配置 server_url 和 cluster_token"
+  when: not cluster_init | bool
+
+- name: 创建配置目录
+  file:
+    path: "{{ config_dir }}"
+    state: directory
+    mode: '0755'
+
+- name: 生成配置文件
+  template:
+    src: config.yaml.j2
+    dest: "{{ config_file }}"
+    mode: "{{ config_file_mode }}"
+  notify: restart {{ cluster_type }}
+
+- name: 下载安装脚本
+  get_url:
+    url: "{{ china_install_script_url if china_region else install_script_url }}"
+    dest: "/tmp/{{ cluster_type }}-install.sh"
+    mode: '0755'
+    timeout: 120
+  retries: "{{ download_retries }}"
+  delay: 5
+
+- name: 设置安装环境变量
+  set_fact:
+    install_env: "{{ install_env_vars | default({}) }}"
+
+- name: 添加版本环境变量 (RKE2)
+  set_fact:
+    install_env: "{{ install_env | combine({'INSTALL_RKE2_VERSION': install_version}) }}"
+  when:
+    - cluster_type == 'rke2'
+    - install_version is defined
+    - install_version | length > 0
+
+- name: 添加版本环境变量 (K3S)
+  set_fact:
+    install_env: "{{ install_env | combine({'INSTALL_K3S_VERSION': install_version}) }}"
+  when:
+    - cluster_type == 'k3s'
+    - install_version is defined
+    - install_version | length > 0
+
+- name: 执行安装脚本 (RKE2)
+  shell: |
+    {% for key, value in install_env.items() %}
+    export {{ key }}="{{ value }}"
+    {% endfor %}
+    INSTALL_RKE2_TYPE="server" sh /tmp/{{ cluster_type }}-install.sh
+  args:
+    creates: "{{ binary_path }}"
+  async: "{{ install_timeout }}"
+  poll: 10
+  when: cluster_type == 'rke2'
+
+- name: 执行安装脚本 (K3S Server)
+  shell: |
+    {% for key, value in install_env.items() %}
+    export {{ key }}="{{ value }}"
+    {% endfor %}
+    INSTALL_K3S_EXEC="server" sh /tmp/{{ cluster_type }}-install.sh
+  args:
+    creates: "{{ binary_path }}"
+  async: "{{ install_timeout }}"
+  poll: 10
+  when: cluster_type == 'k3s'
+
+- name: 启动服务
+  systemd:
+    name: "{{ service_name }}"
+    state: started
+    enabled: yes
+    daemon_reload: yes
+
+- name: 等待服务就绪
+  wait_for:
+    path: "{{ kubeconfig_path }}"
+    timeout: "{{ service_wait_timeout }}"
+  when: cluster_init | bool
+
+- name: 等待 API Server 就绪
+  wait_for:
+    host: "{{ ansible_default_ipv4.address }}"
+    port: "{{ api_port }}"
+    timeout: "{{ service_wait_timeout }}"
+
+- name: 获取节点 Token (初始节点)
+  slurp:
+    src: "{{ token_file }}"
+  register: node_token_content
+  when: cluster_init | bool
+
+- name: 显示节点 Token (初始节点)
+  debug:
+    msg:
+      - "=========================================="
+      - "集群 Token (请妥善保存，用于其他节点加入):"
+      - "{{ node_token_content.content | b64decode | trim }}"
+      - "=========================================="
+  when:
+    - cluster_init | bool
+    - node_token_content is defined
+
+- name: 保存 Token 到本地
+  copy:
+    content: "{{ node_token_content.content | b64decode | trim }}"
+    dest: "/tmp/{{ cluster_type }}-token.txt"
+    mode: '0600'
+  delegate_to: localhost
+  become: false
+  when:
+    - cluster_init | bool
+    - node_token_content is defined
+
+- name: 配置 kubectl 环境变量
+  blockinfile:
+    path: "/root/.bashrc"
+    block: |
+      # {{ cluster_type | upper }} kubectl 配置
+      export KUBECONFIG={{ kubeconfig_path }}
+      export PATH=$PATH:/var/lib/rancher/{{ cluster_type }}/bin
+    marker: "# {mark} ANSIBLE MANAGED BLOCK - {{ cluster_type | upper }}"
+    create: yes
+
+- name: 创建 kubectl 符号链接 (RKE2)
+  file:
+    src: "/var/lib/rancher/rke2/bin/kubectl"
+    dest: "/usr/local/bin/kubectl"
+    state: link
+  when: cluster_type == 'rke2'
+
+- name: 验证节点状态
+  shell: |
+    export KUBECONFIG={{ kubeconfig_path }}
+    {{ binary_path }} kubectl get nodes
+  register: node_status
+  retries: 10
+  delay: 10
+  until: node_status.rc == 0
+  changed_when: false
+
+- name: 显示节点状态
+  debug:
+    var: node_status.stdout_lines
+
+- name: Server 安装完成
+  debug:
+    msg:
+      - "=========================================="
+      - "✓ {{ cluster_type | upper }} Server 节点安装成功"
+      - "Kubeconfig: {{ kubeconfig_path }}"
+      - "API Server: https://{{ ansible_default_ipv4.address }}:{{ api_port }}"
+      - "=========================================="

@@ -1,0 +1,233 @@
+---
+# 预检查任务：验证系统环境
+
+- name: 收集系统信息
+  setup:
+    gather_subset:
+      - "!all"
+      - "!min"
+      - "distribution"
+      - "hardware"
+      - "network"
+  tags: always
+
+- name: 显示系统信息
+  debug:
+    msg:
+      - "操作系统: {{ ansible_distribution }} {{ ansible_distribution_version }}"
+      - "内核版本: {{ ansible_kernel }}"
+      - "CPU 架构: {{ ansible_architecture }}"
+      - "CPU 核心数: {{ ansible_processor_vcpus }}"
+      - "内存总量: {{ ansible_memtotal_mb }} MB"
+  tags: always
+
+- name: 检查操作系统是否支持
+  assert:
+    that:
+      - ansible_os_family in ['Debian', 'RedHat']
+      - >
+        (ansible_distribution == 'Debian' and ansible_distribution_major_version | int >= 12) or
+        (ansible_distribution == 'Ubuntu' and ansible_distribution_version is version('22.04', '>=')) or
+        (ansible_distribution in ['CentOS', 'RedHat', 'Rocky', 'AlmaLinux', 'Anolis'] and ansible_distribution_major_version | int >= 8)
+    fail_msg: "不支持的操作系统: {{ ansible_distribution }} {{ ansible_distribution_version }}"
+    success_msg: "操作系统检查通过"
+
+- name: 检查 CPU 架构
+  assert:
+    that:
+      - ansible_architecture in ['x86_64', 'aarch64', 'arm64']
+    fail_msg: "不支持的 CPU 架构: {{ ansible_architecture }}"
+    success_msg: "CPU 架构检查通过"
+
+- name: 设置架构变量
+  set_fact:
+    arch_suffix: "{{ 'amd64' if ansible_architecture == 'x86_64' else 'arm64' }}"
+
+- name: 检查内存大小 (最小 2GB)
+  assert:
+    that:
+      - ansible_memtotal_mb >= 2048
+    fail_msg: "内存不足，至少需要 2GB，当前: {{ ansible_memtotal_mb }} MB"
+    success_msg: "内存检查通过"
+  when: node_role == "server"
+
+- name: 检查内存大小 (Agent 最小 1GB)
+  assert:
+    that:
+      - ansible_memtotal_mb >= 1024
+    fail_msg: "内存不足，至少需要 1GB，当前: {{ ansible_memtotal_mb }} MB"
+    success_msg: "内存检查通过"
+  when: node_role == "agent"
+
+- name: 检查磁盘空间 (最小 20GB)
+  shell: df -BG / | tail -1 | awk '{print $4}' | sed 's/G//'
+  register: disk_space
+  changed_when: false
+
+- name: 验证磁盘空间
+  assert:
+    that:
+      - disk_space.stdout | int >= 20
+    fail_msg: "磁盘空间不足，至少需要 20GB，当前可用: {{ disk_space.stdout }} GB"
+    success_msg: "磁盘空间检查通过"
+
+- name: 安装必需软件包 (Debian/Ubuntu)
+  apt:
+    name:
+      - curl
+      - wget
+      - gnupg
+      - apt-transport-https
+      - ca-certificates
+      - software-properties-common
+      - iptables
+      - conntrack
+      - socat
+    state: present
+    update_cache: yes
+  when: ansible_os_family == "Debian"
+
+- name: 安装必需软件包 (RHEL/CentOS/Anolis)
+  yum:
+    name:
+      - curl
+      - wget
+      - iptables
+      - conntrack
+      - socat
+      - container-selinux
+      - libseccomp
+    state: present
+  when: ansible_os_family == "RedHat"
+
+- name: 检查 systemd 版本
+  command: systemctl --version
+  register: systemd_version
+  changed_when: false
+
+- name: 验证 systemd 版本
+  assert:
+    that:
+      - systemd_version.stdout_lines[0].split()[1] | int >= 219
+    fail_msg: "systemd 版本过低，需要 >= 219"
+    success_msg: "systemd 版本检查通过"
+
+- name: 禁用 swap
+  shell: |
+    swapoff -a
+    sed -i '/swap/d' /etc/fstab
+  when: disable_swap | bool
+  changed_when: true
+
+- name: 加载内核模块
+  modprobe:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - overlay
+    - br_netfilter
+  when: load_kernel_modules | bool
+
+- name: 持久化内核模块
+  copy:
+    dest: /etc/modules-load.d/k8s.conf
+    content: |
+      overlay
+      br_netfilter
+    mode: '0644'
+  when: load_kernel_modules | bool
+
+- name: 配置 sysctl 参数
+  sysctl:
+    name: "{{ item.name }}"
+    value: "{{ item.value }}"
+    state: present
+    sysctl_file: /etc/sysctl.d/99-kubernetes.conf
+    reload: yes
+  loop:
+    - { name: 'net.bridge.bridge-nf-call-iptables', value: '1' }
+    - { name: 'net.bridge.bridge-nf-call-ip6tables', value: '1' }
+    - { name: 'net.ipv4.ip_forward', value: '1' }
+    - { name: 'net.ipv4.conf.all.forwarding', value: '1' }
+    - { name: 'net.ipv6.conf.all.forwarding', value: '1' }
+    - { name: 'vm.swappiness', value: '0' }
+  when: configure_sysctl | bool
+
+- name: 检查端口占用情况 (Server)
+  wait_for:
+    host: "{{ ansible_default_ipv4.address }}"
+    port: "{{ item.port }}"
+    state: stopped
+    timeout: 1
+  loop: "{{ server_required_ports }}"
+  when: node_role == "server"
+  ignore_errors: yes
+  register: port_check
+
+- name: 显示端口检查结果
+  debug:
+    msg: "警告: 端口 {{ item.item.port }} 已被占用 ({{ item.item.description }})"
+  loop: "{{ port_check.results | default([]) }}"
+  when:
+    - node_role == "server"
+    - item.failed is defined
+    - not item.failed
+  loop_control:
+    label: "{{ item.item.port }}"
+
+- name: 检查防火墙状态 (firewalld)
+  systemd:
+    name: firewalld
+  register: firewalld_status
+  ignore_errors: yes
+  when: ansible_os_family == "RedHat"
+
+- name: 检查防火墙状态 (ufw)
+  command: ufw status
+  register: ufw_status
+  changed_when: false
+  ignore_errors: yes
+  when: ansible_os_family == "Debian"
+
+- name: 显示防火墙提醒
+  debug:
+    msg:
+      - "检测到防火墙正在运行"
+      - "请确保开放必需端口，或设置 configure_firewall=true 自动配置"
+  when: >
+    (ansible_os_family == 'RedHat' and firewalld_status.status.ActiveState == 'active') or
+    (ansible_os_family == 'Debian' and 'Status: active' in ufw_status.stdout)
+
+- name: 测试中国镜像源连通性
+  uri:
+    url: "{{ item }}"
+    method: HEAD
+    timeout: 5
+  loop: "{{ china_network_test_urls }}"
+  register: china_network_test
+  ignore_errors: yes
+  when: china_region | bool
+
+- name: 显示网络测试结果
+  debug:
+    msg: "中国镜像源连通性测试成功"
+  when:
+    - china_region | bool
+    - china_network_test.results | selectattr('status', 'defined') | selectattr('status', 'equalto', 200) | list | length > 0
+
+- name: 检查是否已安装
+  stat:
+    path: "{{ binary_path }}"
+  register: binary_exists
+
+- name: 显示已安装提醒
+  debug:
+    msg:
+      - "检测到 {{ cluster_type | upper }} 已安装"
+      - "二进制文件: {{ binary_path }}"
+      - "如需重新安装，请先卸载"
+  when: binary_exists.stat.exists
+
+- name: 预检查完成
+  debug:
+    msg: "✓ 所有预检查项目通过，系统满足安装要求"

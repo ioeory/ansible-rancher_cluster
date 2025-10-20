@@ -1,0 +1,37 @@
+---
+# RKE2/K3S 安装 Playbook
+# 用途：安装和配置 RKE2 或 K3S 集群
+
+- name: 安装 RKE2/K3S 集群
+  hosts: all
+  become: yes
+  gather_facts: yes
+
+  pre_tasks:
+    - name: 显示安装信息
+      debug:
+        msg:
+          - "=========================================="
+          - "开始安装 {{ cluster_type | upper }} 集群"
+          - "目标主机: {{ inventory_hostname }}"
+          - "=========================================="
+      run_once: no
+
+  roles:
+    - role: rke_k3s
+
+  post_tasks:
+    - name: 安装完成提示
+      debug:
+        msg:
+          - "=========================================="
+          - "✓ 所有节点安装完成"
+          - ""
+          - "后续步骤："
+          - "1. 在 Server 节点执行: export KUBECONFIG=/etc/rancher/{{ cluster_type }}/{{ cluster_type }}.yaml"
+          - "2. 验证节点状态: kubectl get nodes"
+          - "3. 查看 Pod 状态: kubectl get pods -A"
+          - "=========================================="
+      run_once: yes
+      delegate_to: "{{ groups['rke_k3s_servers'][0] }}"
+      when: groups['rke_k3s_servers'] is defined

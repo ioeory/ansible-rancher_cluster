@@ -1,0 +1,106 @@
+---
+# Agent 节点安装任务
+
+- name: 显示 Agent 安装信息
+  debug:
+    msg:
+      - "=========================================="
+      - "开始安装 {{ cluster_type | upper }} Agent 节点"
+      - "Server URL: {{ server_url }}"
+      - "=========================================="
+
+- name: 验证必需参数
+  assert:
+    that:
+      - server_url is defined
+      - server_url | length > 0
+      - cluster_token is defined
+      - cluster_token | length > 0
+    fail_msg: "Agent 节点必须配置 server_url 和 cluster_token"
+
+- name: 创建配置目录
+  file:
+    path: "{{ config_dir }}"
+    state: directory
+    mode: '0755'
+
+- name: 生成配置文件
+  template:
+    src: config.yaml.j2
+    dest: "{{ config_file }}"
+    mode: "{{ config_file_mode }}"
+  notify: restart {{ cluster_type }}
+
+- name: 下载安装脚本
+  get_url:
+    url: "{{ china_install_script_url if china_region else install_script_url }}"
+    dest: "/tmp/{{ cluster_type }}-install.sh"
+    mode: '0755'
+    timeout: 120
+  retries: "{{ download_retries }}"
+  delay: 5
+
+- name: 设置安装环境变量
+  set_fact:
+    install_env: "{{ install_env_vars | default({}) }}"
+
+- name: 添加版本环境变量 (RKE2)
+  set_fact:
+    install_env: "{{ install_env | combine({'INSTALL_RKE2_VERSION': install_version}) }}"
+  when:
+    - cluster_type == 'rke2'
+    - install_version is defined
+    - install_version | length > 0
+
+- name: 添加版本环境变量 (K3S)
+  set_fact:
+    install_env: "{{ install_env | combine({'INSTALL_K3S_VERSION': install_version}) }}"
+  when:
+    - cluster_type == 'k3s'
+    - install_version is defined
+    - install_version | length > 0
+
+- name: 执行安装脚本 (RKE2)
+  shell: |
+    {% for key, value in install_env.items() %}
+    export {{ key }}="{{ value }}"
+    {% endfor %}
+    INSTALL_RKE2_TYPE="agent" sh /tmp/{{ cluster_type }}-install.sh
+  args:
+    creates: "{{ binary_path }}"
+  async: "{{ install_timeout }}"
+  poll: 10
+  when: cluster_type == 'rke2'
+
+- name: 执行安装脚本 (K3S Agent)
+  shell: |
+    {% for key, value in install_env.items() %}
+    export {{ key }}="{{ value }}"
+    {% endfor %}
+    INSTALL_K3S_EXEC="agent" sh /tmp/{{ cluster_type }}-install.sh
+  args:
+    creates: "{{ binary_path }}"
+  async: "{{ install_timeout }}"
+  poll: 10
+  when: cluster_type == 'k3s'
+
+- name: 启动服务
+  systemd:
+    name: "{{ service_name }}"
+    state: started
+    enabled: yes
+    daemon_reload: yes
+
+- name: 等待节点加入集群
+  pause:
+    seconds: 30
+    prompt: "等待 Agent 节点加入集群..."
+
+- name: Agent 安装完成
+  debug:
+    msg:
+      - "=========================================="
+      - "✓ {{ cluster_type | upper }} Agent 节点安装成功"
+      - "节点已加入集群: {{ server_url }}"
+      - "请在 Server 节点执行 kubectl get nodes 验证"
+      - "=========================================="

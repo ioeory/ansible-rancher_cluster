@@ -1,0 +1,16 @@
+# {{ ansible_managed }}
+# Containerd 镜像仓库配置（镜像加速）
+
+mirrors:
+{% for registry, endpoints in registry_mirrors.items() %}
+  "{{ registry }}":
+    endpoint:
+{% for endpoint in endpoints %}
+      - "{{ endpoint }}"
+{% endfor %}
+{% endfor %}
+
+# 注意：
+# 1. 此配置文件用于加速容器镜像拉取
+# 2. 镜像源按顺序尝试，如果第一个失败则尝试下一个
+# 3. 修改后需要重启 {{ cluster_type }} 服务生效

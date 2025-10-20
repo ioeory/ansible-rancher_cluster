@@ -1,0 +1,71 @@
+---
+# 中国大陆镜像源配置
+
+# Containerd Registry 镜像加速配置
+registry_mirrors:
+  # Docker Hub 镜像
+  "docker.io":
+    - "https://dockerhub.mirrors.sjtug.sjtu.edu.cn"
+    - "https://docker.m.daocloud.io"
+    - "https://docker.nju.edu.cn"
+
+  # Kubernetes 官方镜像
+  "registry.k8s.io":
+    - "https://k8s-gcr.m.daocloud.io"
+    - "https://registry.aliyuncs.com/google_containers"
+
+  # Google Container Registry
+  "gcr.io":
+    - "https://gcr.m.daocloud.io"
+
+  # GitHub Container Registry
+  "ghcr.io":
+    - "https://ghcr.m.daocloud.io"
+
+  # Quay.io
+  "quay.io":
+    - "https://quay.m.daocloud.io"
+
+  # Microsoft Container Registry
+  "mcr.microsoft.com":
+    - "https://mcr.m.daocloud.io"
+
+# 可选：阿里云镜像加速器配置示例
+# 用户可以根据自己的阿里云账号配置
+aliyun_mirror_example: "https://<your-id>.mirror.aliyuncs.com"
+
+# 可选：腾讯云镜像加速器
+tencent_mirror: "https://mirror.ccs.tencentyun.com"
+
+# 网络测试 URL (用于检测是否在中国大陆)
+china_network_test_urls:
+  - "https://rancher-mirror.rancher.cn"
+  - "https://mirrors.aliyun.com"
+
+# APT 源镜像 (Debian/Ubuntu)
+apt_mirrors:
+  debian:
+    - "https://mirrors.tuna.tsinghua.edu.cn/debian/"
+    - "https://mirrors.aliyun.com/debian/"
+    - "https://mirrors.ustc.edu.cn/debian/"
+  ubuntu:
+    - "https://mirrors.tuna.tsinghua.edu.cn/ubuntu/"
+    - "https://mirrors.aliyun.com/ubuntu/"
+    - "https://mirrors.ustc.edu.cn/ubuntu/"
+
+# YUM 源镜像 (RHEL/CentOS/Anolis)
+yum_mirrors:
+  epel:
+    - "https://mirrors.tuna.tsinghua.edu.cn/epel/"
+    - "https://mirrors.aliyun.com/epel/"
+  centos:
+    - "https://mirrors.tuna.tsinghua.edu.cn/centos/"
+    - "https://mirrors.aliyun.com/centos/"
+  anolis:
+    - "https://mirrors.openanolis.cn/anolis/"
+
+# PyPI 镜像源
+pypi_mirror: "https://pypi.tuna.tsinghua.edu.cn/simple"
+
+# NPM 镜像源
+npm_mirror: "https://registry.npmmirror.com"

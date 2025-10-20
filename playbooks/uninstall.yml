@@ -1,0 +1,125 @@
+---
+# RKE2/K3S 卸载 Playbook
+# 用途：完全卸载 RKE2 或 K3S 集群
+# 警告：此操作将删除所有数据，请谨慎使用！
+
+- name: 卸载 RKE2/K3S 集群
+  hosts: all
+  become: yes
+  gather_facts: yes
+
+  vars_prompt:
+    - name: confirm_uninstall
+      prompt: "确认卸载集群？所有数据将被删除！(yes/no)"
+      private: no
+
+  pre_tasks:
+    - name: 加载集群类型变量
+      set_fact:
+        cluster_type: "{{ cluster_type | default('rke2') }}"
+      run_once: yes
+    - name: 验证确认
+      assert:
+        that:
+          - confirm_uninstall == 'yes'
+        fail_msg: "卸载操作已取消"
+      run_once: yes
+
+    - name: 显示卸载警告
+      debug:
+        msg:
+          - "=========================================="
+          - "⚠️  警告：开始卸载 {{ cluster_type | upper }}"
+          - "主机: {{ inventory_hostname }}"
+          - "所有数据将被永久删除！"
+          - "=========================================="
+
+  tasks:
+    - name: 加载集群类型变量
+      include_vars: "../roles/rke_k3s/vars/{{ cluster_type }}.yml"
+
+    - name: 停止服务
+      systemd:
+        name: "{{ service_name }}"
+        state: stopped
+        enabled: no
+      ignore_errors: yes
+
+    - name: 执行卸载脚本 (RKE2)
+      shell: |
+        /usr/local/bin/rke2-uninstall.sh
+      when:
+        - cluster_type == 'rke2'
+      ignore_errors: yes
+
+    - name: 执行卸载脚本 (K3S Server)
+      shell: |
+        /usr/local/bin/k3s-uninstall.sh
+      when:
+        - cluster_type == 'k3s'
+        - node_role == 'server'
+      ignore_errors: yes
+
+    - name: 执行卸载脚本 (K3S Agent)
+      shell: |
+        /usr/local/bin/k3s-agent-uninstall.sh
+      when:
+        - cluster_type == 'k3s'
+        - node_role == 'agent'
+      ignore_errors: yes
+
+    - name: 删除配置目录
+      file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - "/etc/rancher/{{ cluster_type }}"
+        - "/var/lib/rancher/{{ cluster_type }}"
+        - "/var/lib/kubelet"
+        - "/etc/cni"
+        - "/opt/cni"
+        - "/var/lib/cni"
+        - "/run/k8s"
+      ignore_errors: yes
+
+    - name: 清理 iptables 规则
+      shell: |
+        iptables-save | grep -v {{ cluster_type | upper }} | iptables-restore
+        ip6tables-save | grep -v {{ cluster_type | upper }} | ip6tables-restore
+      ignore_errors: yes
+
+    - name: 删除网络接口
+      shell: |
+        ip link delete cni0 2>/dev/null || true
+        ip link delete flannel.1 2>/dev/null || true
+        ip link delete kube-ipvs0 2>/dev/null || true
+      ignore_errors: yes
+
+    - name: 清理环境变量配置
+      blockinfile:
+        path: "/root/.bashrc"
+        state: absent
+        marker: "# {mark} ANSIBLE MANAGED BLOCK - {{ cluster_type | upper }}"
+      ignore_errors: yes
+
+    - name: 删除 kubectl 符号链接
+      file:
+        path: /usr/local/bin/kubectl
+        state: absent
+      ignore_errors: yes
+
+  post_tasks:
+    - name: 卸载完成提示
+      debug:
+        msg:
+          - "=========================================="
+          - "✓ {{ cluster_type | upper }} 卸载完成"
+          - ""
+          - "已清理："
+          - "  - 服务和进程"
+          - "  - 配置文件"
+          - "  - 数据目录"
+          - "  - 网络接口和规则"
+          - ""
+          - "建议重启系统以确保完全清理"
+          - "=========================================="

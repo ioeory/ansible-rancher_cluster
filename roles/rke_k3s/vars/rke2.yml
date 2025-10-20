@@ -1,0 +1,88 @@
+---
+# RKE2 特定变量配置
+
+# 服务名称
+service_name: "rke2-{{ node_role }}"
+
+# 配置目录
+config_dir: "/etc/rancher/rke2"
+
+# 数据目录
+default_data_dir: "/var/lib/rancher/rke2"
+
+# Kubeconfig 路径
+kubeconfig_path: "/etc/rancher/rke2/rke2.yaml"
+
+# Token 文件路径
+token_file: "/var/lib/rancher/rke2/server/node-token"
+
+# 配置文件路径
+config_file: "/etc/rancher/rke2/config.yaml"
+
+# Registries 配置文件路径
+registries_config: "/etc/rancher/rke2/registries.yaml"
+
+# 二进制文件路径
+binary_path: "/usr/local/bin/rke2"
+
+# Server Join Port
+server_port: "9345"
+
+# API Server Port
+api_port: "6443"
+
+# 官方安装脚本 URL
+install_script_url: "https://get.rke2.io"
+
+# 中国镜像安装脚本 URL
+china_install_script_url: "https://rancher-mirror.rancher.cn/rke2/install.sh"
+
+# 中国镜像地址环境变量
+china_mirror_env:
+  INSTALL_RKE2_MIRROR: "cn"
+
+# 必需端口列表 (Server)
+server_required_ports:
+  - port: 6443
+    protocol: "tcp"
+    description: "Kubernetes API Server"
+  - port: 9345
+    protocol: "tcp"
+    description: "RKE2 Server Join"
+  - port: 10250
+    protocol: "tcp"
+    description: "Kubelet"
+  - port: 2379
+    protocol: "tcp"
+    description: "etcd client"
+  - port: 2380
+    protocol: "tcp"
+    description: "etcd peer"
+
+# 必需端口列表 (Agent)
+agent_required_ports:
+  - port: 10250
+    protocol: "tcp"
+    description: "Kubelet"
+  - port: 8472
+    protocol: "udp"
+    description: "VXLAN (Canal/Flannel)"
+
+# 默认 CNI
+default_cni: "canal"
+
+# 支持的 CNI 列表
+supported_cni:
+  - "canal"
+  - "calico"
+  - "cilium"
+  - "none"
+
+# 备份命令
+backup_command: "rke2 etcd-snapshot save --name snapshot-$(date +%Y%m%d-%H%M%S)"
+
+# 备份目录
+backup_dir: "/var/lib/rancher/rke2/server/db/snapshots"
+
+# CIS 模式 (强化安全)
+cis_profile: false

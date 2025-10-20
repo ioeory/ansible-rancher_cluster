@@ -1,0 +1,95 @@
+---
+# RKE2/K3S 升级 Playbook
+# 用途：滚动升级 RKE2 或 K3S 集群
+
+- name: 升级 Server 节点
+  hosts: rke_k3s_servers
+  become: yes
+  gather_facts: yes
+  serial: 1  # 每次升级一个 Server，确保高可用
+
+  pre_tasks:
+    - name: 显示升级信息
+      debug:
+        msg:
+          - "=========================================="
+          - "开始升级 Server 节点: {{ inventory_hostname }}"
+          - "目标版本: {{ install_version | default('最新版本', true) }}"
+          - "=========================================="
+
+  roles:
+    - role: rke_k3s
+
+  tasks:
+    - name: 加载集群类型特定变量
+      include_vars: "../roles/rke_k3s/vars/{{ cluster_type }}.yml"
+
+    - name: 设置升级标志
+      set_fact:
+        upgrade_cluster: true
+
+    - name: 执行升级
+      include_role:
+        name: rke_k3s
+        tasks_from: upgrade
+
+  post_tasks:
+    - name: 等待节点稳定
+      pause:
+        seconds: 30
+        prompt: "等待 Server 节点稳定后继续..."
+
+- name: 升级 Agent 节点
+  hosts: rke_k3s_agents
+  become: yes
+  gather_facts: yes
+  serial: "30%"  # 每次升级 30% 的 Agent 节点
+
+  pre_tasks:
+    - name: 显示升级信息
+      debug:
+        msg:
+          - "=========================================="
+          - "开始升级 Agent 节点: {{ inventory_hostname }}"
+          - "=========================================="
+
+  tasks:
+    - name: 加载集群类型特定变量
+      include_vars: "../roles/rke_k3s/vars/{{ cluster_type }}.yml"
+
+    - name: 设置升级标志
+      set_fact:
+        upgrade_cluster: true
+
+    - name: 执行升级
+      include_role:
+        name: rke_k3s
+        tasks_from: upgrade
+
+  post_tasks:
+    - name: 等待节点稳定
+      pause:
+        seconds: 15
+
+- name: 升级完成验证
+  hosts: rke_k3s_servers[0]
+  become: yes
+  gather_facts: no
+
+  tasks:
+    - name: 验证所有节点状态
+      shell: |
+        export KUBECONFIG=/etc/rancher/{{ cluster_type }}/{{ cluster_type }}.yaml
+        kubectl get nodes
+      register: final_status
+      changed_when: false
+
+    - name: 显示最终状态
+      debug:
+        msg:
+          - "=========================================="
+          - "✓ 集群升级完成"
+          - ""
+          - "节点状态："
+          - "{{ final_status.stdout_lines | join('\n') }}"
+          - "=========================================="

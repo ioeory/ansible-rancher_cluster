@@ -1,0 +1,89 @@
+---
+# K3S 特定变量配置
+
+# 服务名称
+service_name: "k3s"
+
+# 配置目录
+config_dir: "/etc/rancher/k3s"
+
+# 数据目录
+default_data_dir: "/var/lib/rancher/k3s"
+
+# Kubeconfig 路径
+kubeconfig_path: "/etc/rancher/k3s/k3s.yaml"
+
+# Token 文件路径
+token_file: "/var/lib/rancher/k3s/server/node-token"
+
+# 配置文件路径
+config_file: "/etc/rancher/k3s/config.yaml"
+
+# Registries 配置文件路径
+registries_config: "/etc/rancher/k3s/registries.yaml"
+
+# 二进制文件路径
+binary_path: "/usr/local/bin/k3s"
+
+# Server Join Port (K3S 使用 API 端口)
+server_port: "6443"
+
+# API Server Port
+api_port: "6443"
+
+# 官方安装脚本 URL
+install_script_url: "https://get.k3s.io"
+
+# 中国镜像安装脚本 URL
+china_install_script_url: "https://rancher-mirror.rancher.cn/k3s/k3s-install.sh"
+
+# 中国镜像地址环境变量
+china_mirror_env:
+  INSTALL_K3S_MIRROR: "cn"
+
+# 必需端口列表 (Server)
+server_required_ports:
+  - port: 6443
+    protocol: "tcp"
+    description: "Kubernetes API Server"
+  - port: 10250
+    protocol: "tcp"
+    description: "Kubelet"
+  - port: 2379
+    protocol: "tcp"
+    description: "etcd client"
+  - port: 2380
+    protocol: "tcp"
+    description: "etcd peer"
+
+# 必需端口列表 (Agent)
+agent_required_ports:
+  - port: 10250
+    protocol: "tcp"
+    description: "Kubelet"
+  - port: 8472
+    protocol: "udp"
+    description: "VXLAN (Flannel)"
+
+# 默认 CNI
+default_cni: "flannel"
+
+# 支持的 CNI 列表
+supported_cni:
+  - "flannel"
+  - "calico"
+  - "cilium"
+  - "none"
+
+# 默认禁用的组件 (可选)
+default_disable_components:
+  []
+  # - "traefik"      # 默认 Ingress Controller
+  # - "servicelb"    # 默认 LoadBalancer
+  # - "metrics-server"
+
+# 备份命令
+backup_command: "k3s etcd-snapshot save --name snapshot-$(date +%Y%m%d-%H%M%S)"
+
+# 备份目录
+backup_dir: "/var/lib/rancher/k3s/server/db/snapshots"

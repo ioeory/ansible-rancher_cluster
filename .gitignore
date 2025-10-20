@@ -1,0 +1,63 @@
+# Ansible
+*.retry
+.ansible/
+*.log
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+venv/
+ENV/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# 实际配置文件（不提交敏感信息）
+inventory/hosts.ini
+inventory/group_vars/all.yml
+inventory/host_vars/
+
+# Vault 密码文件
+.vault_pass
+*.vault
+
+# 临时文件
+*.tmp
+*.bak
+.tmp/
+
+# Token 文件
+*-token.txt
+
+# 日志文件
+*.log
+
+# 操作系统
+Thumbs.db
+.DS_Store

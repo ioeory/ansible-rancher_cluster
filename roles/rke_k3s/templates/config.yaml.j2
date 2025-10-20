@@ -1,0 +1,178 @@
+# {{ ansible_managed }}
+# {{ cluster_type | upper }} 配置文件
+# 节点角色: {{ node_role }}
+
+{% if node_role == 'server' %}
+# ============================================================================
+# Server 节点配置
+# ============================================================================
+
+{% if cluster_init %}
+# 集群初始化模式（仅第一个 server 节点）
+cluster-init: true
+{% else %}
+# 加入现有集群
+server: {{ server_url }}
+{% endif %}
+
+{% if cluster_token %}
+# 集群 Token
+token: {{ cluster_token }}
+{% endif %}
+
+{% if tls_san | length > 0 %}
+# TLS Subject Alternative Names
+tls-san:
+{% for san in tls_san %}
+  - {{ san }}
+{% endfor %}
+{% endif %}
+
+{% if cluster_cidr %}
+# Pod 网络 CIDR
+cluster-cidr: {{ cluster_cidr }}
+{% endif %}
+
+{% if service_cidr %}
+# Service CIDR
+service-cidr: {{ service_cidr }}
+{% endif %}
+
+{% if cluster_dns %}
+# Cluster DNS
+cluster-dns: {{ cluster_dns }}
+{% endif %}
+
+{% if cni %}
+# CNI 插件
+cni: {{ cni }}
+{% endif %}
+
+{% if data_dir %}
+# 数据目录
+data-dir: {{ data_dir }}
+{% endif %}
+
+{% if node_name %}
+# 节点名称
+node-name: {{ node_name }}
+{% endif %}
+
+{% if node_labels | length > 0 %}
+# 节点标签
+node-label:
+{% for label in node_labels %}
+  - {{ label }}
+{% endfor %}
+{% endif %}
+
+{% if node_taints | length > 0 %}
+# 节点污点
+node-taint:
+{% for taint in node_taints %}
+  - {{ taint }}
+{% endfor %}
+{% endif %}
+
+{% if secrets_encryption %}
+# 启用 Secrets 加密
+secrets-encryption: true
+{% endif %}
+
+{% if enable_backup and etcd_snapshot_schedule %}
+# etcd 快照配置
+etcd-snapshot-schedule-cron: "{{ etcd_snapshot_schedule }}"
+etcd-snapshot-retention: {{ etcd_snapshot_retention }}
+{% endif %}
+
+{% if cluster_type == 'k3s' and disable_components | length > 0 %}
+# 禁用的组件
+disable:
+{% for component in disable_components %}
+  - {{ component }}
+{% endfor %}
+{% endif %}
+
+{% if cluster_type == 'rke2' and cis_profile %}
+# CIS 强化模式
+profile: cis-1.6
+{% endif %}
+
+{% if kubelet_args | length > 0 %}
+# Kubelet 参数
+kubelet-arg:
+{% for arg in kubelet_args %}
+  - {{ arg }}
+{% endfor %}
+{% endif %}
+
+{% if kube_apiserver_args | length > 0 %}
+# Kube-apiserver 参数
+kube-apiserver-arg:
+{% for arg in kube_apiserver_args %}
+  - {{ arg }}
+{% endfor %}
+{% endif %}
+
+{% if kube_controller_manager_args | length > 0 %}
+# Kube-controller-manager 参数
+kube-controller-manager-arg:
+{% for arg in kube_controller_manager_args %}
+  - {{ arg }}
+{% endfor %}
+{% endif %}
+
+{% if kube_scheduler_args | length > 0 %}
+# Kube-scheduler 参数
+kube-scheduler-arg:
+{% for arg in kube_scheduler_args %}
+  - {{ arg }}
+{% endfor %}
+{% endif %}
+
+{% else %}
+# ============================================================================
+# Agent 节点配置
+# ============================================================================
+
+# Server URL
+server: {{ server_url }}
+
+# 集群 Token
+token: {{ cluster_token }}
+
+{% if data_dir %}
+# 数据目录
+data-dir: {{ data_dir }}
+{% endif %}
+
+{% if node_name %}
+# 节点名称
+node-name: {{ node_name }}
+{% endif %}
+
+{% if node_labels | length > 0 %}
+# 节点标签
+node-label:
+{% for label in node_labels %}
+  - {{ label }}
+{% endfor %}
+{% endif %}
+
+{% if node_taints | length > 0 %}
+# 节点污点
+node-taint:
+{% for taint in node_taints %}
+  - {{ taint }}
+{% endfor %}
+{% endif %}
+
+{% if kubelet_args | length > 0 %}
+# Kubelet 参数
+kubelet-arg:
+{% for arg in kubelet_args %}
+  - {{ arg }}
+{% endfor %}
+{% endif %}
+
+{% endif %}

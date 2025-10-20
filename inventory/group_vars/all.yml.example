@@ -1,0 +1,167 @@
+---
+# 全局变量配置示例
+# 
+# 使用说明：
+# 1. 复制为 all.yml: cp all.yml.example all.yml
+# 2. 根据实际需求修改配置
+# 3. 敏感信息建议使用 ansible-vault 加密
+
+# ============================================================================
+# 集群基础配置
+# ============================================================================
+
+# 集群类型: rke2 或 k3s
+cluster_type: "rke2"
+
+# 安装版本
+# RKE2 示例: v1.28.5+rke2r1, v1.27.10+rke2r1
+# K3S 示例: v1.28.5+k3s1, v1.27.10+k3s1
+# 留空则安装最新稳定版
+install_version: ""
+
+# ============================================================================
+# 地区配置
+# ============================================================================
+
+# 中国大陆地区 (自动使用 rancher.cn 镜像源)
+china_region: false
+
+# 启用镜像加速
+enable_registry_mirrors: "{{ china_region }}"
+
+# ============================================================================
+# 集群网络配置
+# ============================================================================
+
+# HA 模式负载均衡器地址
+# RKE2: server_url: "https://lb.example.com:9345"
+# K3S: server_url: "https://lb.example.com:6443"
+server_url: ""
+
+# 集群共享 Token (首个 server 可留空自动生成)
+# 生产环境建议使用: ansible-vault encrypt_string 'your-token' --name 'cluster_token'
+cluster_token: ""
+
+# TLS SAN 列表
+tls_san:
+  - "lb.example.com"
+  - "192.168.1.100"
+  - "k8s.example.com"
+
+# Pod 网络 CIDR
+cluster_cidr: ""  # 留空使用默认 10.42.0.0/16
+
+# Service CIDR
+service_cidr: ""  # 留空使用默认 10.43.0.0/16
+
+# CNI 插件
+# RKE2 支持: canal (默认), calico, cilium
+# K3S 支持: flannel (默认), calico, cilium
+cni: ""
+
+# ============================================================================
+# 节点配置
+# ============================================================================
+
+# 节点标签 (可选)
+node_labels: []
+  # - "environment=production"
+  # - "workload=high-memory"
+
+# 节点污点 (可选)
+node_taints: []
+  # - "node-role.kubernetes.io/control-plane:NoSchedule"
+
+# ============================================================================
+# K3S 特定配置
+# ============================================================================
+
+# K3S 禁用组件 (可选)
+disable_components: []
+  # - "traefik"        # 禁用默认 Ingress Controller
+  # - "servicelb"      # 禁用默认 LoadBalancer
+  # - "metrics-server" # 禁用 Metrics Server
+
+# ============================================================================
+# 安全配置
+# ============================================================================
+
+# 启用 Secrets 加密
+secrets_encryption: false
+
+# RKE2 CIS 强化模式
+cis_profile: false
+
+# ============================================================================
+# 备份配置
+# ============================================================================
+
+# 启用自动备份
+enable_backup: false
+
+# 备份保留数量
+etcd_snapshot_retention: 5
+
+# 备份计划 (cron 格式: 每 12 小时一次)
+etcd_snapshot_schedule: "0 */12 * * *"
+
+# 升级前自动备份
+backup_before_upgrade: true
+
+# ============================================================================
+# 系统优化
+# ============================================================================
+
+# 禁用 swap
+disable_swap: true
+
+# 加载内核模块
+load_kernel_modules: true
+
+# 配置 sysctl 参数
+configure_sysctl: true
+
+# ============================================================================
+# 防火墙配置
+# ============================================================================
+
+# 自动配置防火墙规则
+configure_firewall: false
+
+# 防火墙类型: firewalld (RHEL/CentOS) 或 ufw (Debian/Ubuntu)
+firewall_type: "firewalld"
+
+# ============================================================================
+# 高级配置
+# ============================================================================
+
+# Kubelet 额外参数
+kubelet_args: []
+  # - "max-pods=200"
+  # - "eviction-hard=memory.available<500Mi"
+
+# Kube-apiserver 额外参数
+kube_apiserver_args: []
+  # - "enable-admission-plugins=NodeRestriction,PodSecurityPolicy"
+
+# Kube-controller-manager 额外参数
+kube_controller_manager_args: []
+
+# Kube-scheduler 额外参数
+kube_scheduler_args: []
+
+# ============================================================================
+# 安装选项
+# ============================================================================
+
+# 跳过预检查 (不推荐)
+skip_preflight: false
+
+# 安装超时 (秒)
+install_timeout: 1800
+
+# 服务启动等待时间 (秒)
+service_wait_timeout: 300
+
+# 下载重试次数
+download_retries: 3

@@ -1,0 +1,40 @@
+---
+# RKE2/K3S 备份 Playbook
+# 用途：备份所有 Server 节点的 etcd 数据
+
+- name: 备份 etcd 快照
+  hosts: rke_k3s_servers
+  become: yes
+  gather_facts: yes
+
+  pre_tasks:
+    - name: 显示备份信息
+      debug:
+        msg:
+          - "=========================================="
+          - "开始备份 Server 节点: {{ inventory_hostname }}"
+          - "=========================================="
+
+  tasks:
+    - name: 加载集群类型特定变量
+      include_vars: "../roles/rke_k3s/vars/{{ cluster_type }}.yml"
+
+    - name: 执行备份
+      include_role:
+        name: rke_k3s
+        tasks_from: backup
+
+  post_tasks:
+    - name: 备份完成提示
+      debug:
+        msg:
+          - "=========================================="
+          - "✓ 所有 Server 节点备份完成"
+          - ""
+          - "备份文件位置："
+          - "  - /var/lib/rancher/{{ cluster_type }}/server/db/snapshots/"
+          - ""
+          - "恢复命令示例："
+          - "  - {{ cluster_type }} server --cluster-reset --cluster-reset-restore-path=<snapshot-file>"
+          - "=========================================="
+      run_once: yes

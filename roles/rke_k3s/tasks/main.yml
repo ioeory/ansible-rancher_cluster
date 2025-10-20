@@ -1,0 +1,67 @@
+---
+# RKE2/K3S Ansible Role - 主任务入口
+
+- name: 加载集群类型特定变量
+  include_vars: "{{ cluster_type }}.yml"
+  tags: always
+
+- name: 加载中国镜像源配置
+  include_vars: china_mirrors.yml
+  when: china_region | bool
+  tags: always
+
+- name: 显示集群配置信息
+  debug:
+    msg:
+      - "=========================================="
+      - "集群类型: {{ cluster_type | upper }}"
+      - "节点角色: {{ node_role | upper }}"
+      - "中国地区: {{ china_region }}"
+      - "集群初始化: {{ cluster_init }}"
+      - "安装版本: {{ install_version | default('最新稳定版', true) }}"
+      - "=========================================="
+  tags: always
+
+- name: 预检查环境
+  include_tasks: preflight.yml
+  when: not skip_preflight | bool
+  tags:
+    - preflight
+    - install
+
+- name: 配置中国大陆特殊环境
+  include_tasks: configure_china.yml
+  when: china_region | bool
+  tags:
+    - china
+    - install
+
+- name: 安装 Server 节点
+  include_tasks: install_server.yml
+  when: node_role == "server"
+  tags:
+    - install
+    - server
+
+- name: 安装 Agent 节点
+  include_tasks: install_agent.yml
+  when: node_role == "agent"
+  tags:
+    - install
+    - agent
+
+- name: 备份 etcd 数据
+  include_tasks: backup.yml
+  when:
+    - node_role == "server"
+    - enable_backup | bool
+  tags:
+    - backup
+    - never  # 需要显式指定 --tags backup 才会执行
+
+- name: 升级集群
+  include_tasks: upgrade.yml
+  when: upgrade_cluster is defined and upgrade_cluster | bool
+  tags:
+    - upgrade
+    - never  # 需要显式指定 --tags upgrade 才会执行

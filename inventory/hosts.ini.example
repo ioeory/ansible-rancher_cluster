@@ -1,0 +1,83 @@
+# RKE2/K3S Ansible Inventory 示例配置
+# 
+# 使用说明：
+# 1. 复制此文件为 hosts.ini: cp hosts.ini.example hosts.ini
+# 2. 修改 IP 地址和主机名为实际环境
+# 3. 取消注释所需的配置场景
+# 4. 配置 group_vars 目录下的变量文件
+
+# ============================================================================
+# 场景 1: 单节点测试集群
+# ============================================================================
+#[rke_k3s_servers]
+#node1 ansible_host=192.168.1.10 cluster_init=true
+
+# ============================================================================
+# 场景 2: 高可用集群 (3 个 Server 节点)
+# ============================================================================
+[rke_k3s_servers]
+node1 ansible_host=192.168.1.10 cluster_init=true
+node2 ansible_host=192.168.1.11
+node3 ansible_host=192.168.1.12
+
+# ============================================================================
+# 场景 3: Server + Agent 混合集群
+# ============================================================================
+#[rke_k3s_servers]
+#master1 ansible_host=192.168.1.10 cluster_init=true
+#master2 ansible_host=192.168.1.11
+#master3 ansible_host=192.168.1.12
+
+#[rke_k3s_agents]
+#worker1 ansible_host=192.168.1.20
+#worker2 ansible_host=192.168.1.21
+#worker3 ansible_host=192.168.1.22
+
+# ============================================================================
+# 全局变量 (所有节点)
+# ============================================================================
+[rke_k3s_servers:vars]
+node_role=server
+
+[rke_k3s_agents:vars]
+node_role=agent
+
+[all:vars]
+# Ansible 连接配置
+ansible_user=root
+ansible_ssh_private_key_file=~/.ssh/id_rsa
+ansible_ssh_common_args='-o StrictHostKeyChecking=no'
+
+# 集群类型: rke2 或 k3s
+cluster_type=rke2
+
+# 中国大陆地区 (启用镜像加速)
+china_region=false
+
+# 安装版本 (留空安装最新版本)
+# install_version=v1.28.5+rke2r1
+install_version=
+
+# 集群共享 Token (自动生成或手动指定)
+# 建议使用 ansible-vault 加密
+cluster_token=
+
+# HA 模式负载均衡器地址 (必须配置)
+# RKE2: https://lb.example.com:9345
+# K3S: https://lb.example.com:6443
+server_url=https://192.168.1.100:9345
+
+# TLS SAN (负载均衡器地址、VIP、域名)
+tls_san=['192.168.1.100', 'k8s.example.com']
+
+# 系统优化
+disable_swap=true
+load_kernel_modules=true
+configure_sysctl=true
+
+# 备份配置
+enable_backup=false
+etcd_snapshot_retention=5
+
+# 防火墙配置
+configure_firewall=false

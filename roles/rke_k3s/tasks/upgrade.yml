@@ -1,0 +1,125 @@
+---
+# 集群升级任务
+
+- name: 显示升级信息
+  debug:
+    msg:
+      - "=========================================="
+      - "开始升级 {{ cluster_type | upper }}"
+      - "目标版本: {{ install_version | default('最新版本', true) }}"
+      - "=========================================="
+
+- name: 获取当前版本
+  shell: |
+    {{ binary_path }} --version | head -1
+  register: current_version
+  changed_when: false
+
+- name: 显示当前版本
+  debug:
+    msg: "当前版本: {{ current_version.stdout }}"
+
+- name: 升级前备份
+  include_tasks: backup.yml
+  when: backup_before_upgrade | bool
+
+- name: 确认升级
+  pause:
+    prompt: "确认升级？按 Enter 继续，Ctrl+C 取消"
+  when: not ansible_check_mode
+
+- name: 下载新版本安装脚本
+  get_url:
+    url: "{{ china_install_script_url if china_region else install_script_url }}"
+    dest: "/tmp/{{ cluster_type }}-install.sh"
+    mode: '0755'
+    force: yes
+    timeout: 120
+  retries: "{{ download_retries }}"
+  delay: 5
+
+- name: 设置安装环境变量
+  set_fact:
+    install_env: "{{ install_env_vars | default({}) }}"
+
+- name: 添加版本环境变量 (RKE2)
+  set_fact:
+    install_env: "{{ install_env | combine({'INSTALL_RKE2_VERSION': install_version}) }}"
+  when:
+    - cluster_type == 'rke2'
+    - install_version is defined
+    - install_version | length > 0
+
+- name: 添加版本环境变量 (K3S)
+  set_fact:
+    install_env: "{{ install_env | combine({'INSTALL_K3S_VERSION': install_version}) }}"
+  when:
+    - cluster_type == 'k3s'
+    - install_version is defined
+    - install_version | length > 0
+
+- name: 执行升级 (RKE2)
+  shell: |
+    {% for key, value in install_env.items() %}
+    export {{ key }}="{{ value }}"
+    {% endfor %}
+    INSTALL_RKE2_TYPE="{{ node_role }}" sh /tmp/{{ cluster_type }}-install.sh
+  async: "{{ upgrade_timeout }}"
+  poll: 10
+  when: cluster_type == 'rke2'
+  register: upgrade_result
+
+- name: 执行升级 (K3S)
+  shell: |
+    {% for key, value in install_env.items() %}
+    export {{ key }}="{{ value }}"
+    {% endfor %}
+    INSTALL_K3S_EXEC="{{ node_role }}" sh /tmp/{{ cluster_type }}-install.sh
+  async: "{{ upgrade_timeout }}"
+  poll: 10
+  when: cluster_type == 'k3s'
+  register: upgrade_result
+
+- name: 重启服务
+  systemd:
+    name: "{{ service_name }}"
+    state: restarted
+    daemon_reload: yes
+
+- name: 等待服务恢复
+  wait_for:
+    host: "{{ ansible_default_ipv4.address }}"
+    port: "{{ api_port }}"
+    timeout: "{{ service_wait_timeout }}"
+  when: node_role == "server"
+
+- name: 验证升级后版本
+  shell: |
+    {{ binary_path }} --version | head -1
+  register: new_version
+  changed_when: false
+
+- name: 显示新版本
+  debug:
+    msg:
+      - "=========================================="
+      - "✓ 升级完成"
+      - "旧版本: {{ current_version.stdout }}"
+      - "新版本: {{ new_version.stdout }}"
+      - "=========================================="
+
+- name: 验证节点状态 (Server)
+  shell: |
+    export KUBECONFIG={{ kubeconfig_path }}
+    {{ binary_path }} kubectl get nodes
+  register: node_status
+  retries: 10
+  delay: 10
+  until: node_status.rc == 0
+  changed_when: false
+  when: node_role == "server"
+
+- name: 显示节点状态
+  debug:
+    var: node_status.stdout_lines
+  when: node_role == "server"

@@ -1,0 +1,58 @@
+---
+# yamllint 配置文件
+# 适用于 Ansible 项目的宽松规则
+
+extends: default
+
+rules:
+  # 行长度：Ansible 经常需要较长的行
+  line-length:
+    max: 160
+    level: warning
+  
+  # Truthy 值：Ansible 中 yes/no 很常见，允许使用
+  truthy:
+    allowed-values: ['true', 'false', 'yes', 'no', 'on', 'off']
+    check-keys: false
+  
+  # 注释缩进：不强制要求
+  comments-indentation:
+    level: warning
+  
+  # 花括号：Ansible 变量中常见
+  braces:
+    max-spaces-inside: 1
+    level: warning
+  
+  # 尾随空格：建议修复但不报错
+  trailing-spaces:
+    level: warning
+  
+  # 文档开始标记：允许但不强制
+  document-start: disable
+  
+  # 空行：不强制要求
+  empty-lines:
+    max: 2
+    level: warning
+  
+  # 缩进：2 空格
+  indentation:
+    spaces: 2
+    indent-sequences: true
+  
+  # 键重复：报错
+  key-duplicates:
+    level: error
+  
+  # 新行：建议但不强制
+  new-line-at-end-of-file:
+    level: warning
+
+ignore: |
+  .git/
+  venv/
+  __pycache__/
+  *.retry
+  .ansible/
+

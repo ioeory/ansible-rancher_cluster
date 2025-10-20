@@ -1,0 +1,70 @@
+---
+# etcd 备份任务
+
+- name: 显示备份信息
+  debug:
+    msg:
+      - "=========================================="
+      - "开始备份 etcd 数据"
+      - "备份目录: {{ backup_dir }}"
+      - "=========================================="
+
+- name: 检查服务状态
+  systemd:
+    name: "{{ service_name }}"
+  register: service_status
+
+- name: 验证服务运行
+  assert:
+    that:
+      - service_status.status.ActiveState == "active"
+    fail_msg: "{{ cluster_type | upper }} 服务未运行，无法执行备份"
+
+- name: 创建备份目录
+  file:
+    path: "{{ backup_dir }}"
+    state: directory
+    mode: '0700'
+
+- name: 执行 etcd 快照备份
+  shell: |
+    {{ backup_command }}
+  register: backup_result
+  changed_when: true
+
+- name: 获取最新备份文件
+  find:
+    paths: "{{ backup_dir }}"
+    patterns: "snapshot-*.db"
+    file_type: file
+  register: backup_files
+
+- name: 显示备份文件
+  debug:
+    msg:
+      - "最新备份文件:"
+      - "{{ backup_files.files | sort(attribute='mtime', reverse=true) | first | json_query('path') }}"
+  when: backup_files.matched > 0
+
+- name: 清理旧备份
+  shell: |
+    cd {{ backup_dir }}
+    ls -t snapshot-*.db | tail -n +{{ etcd_snapshot_retention + 1 }} | xargs -r rm -f
+  when: etcd_snapshot_retention is defined
+  changed_when: true
+
+- name: 备份统计
+  find:
+    paths: "{{ backup_dir }}"
+    patterns: "snapshot-*.db"
+    file_type: file
+  register: backup_count
+
+- name: 显示备份统计
+  debug:
+    msg:
+      - "=========================================="
+      - "✓ 备份完成"
+      - "当前保留备份数: {{ backup_count.matched }}"
+      - "备份目录: {{ backup_dir }}"
+      - "=========================================="
