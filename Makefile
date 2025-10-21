@@ -203,28 +203,58 @@ reset: ## 重置仓库到初始状态（删除所有本地配置）
 		echo "$(YELLOW)已取消$(NC)"; \
 	fi
 
-setup: ## 初始化配置文件
-	@echo "$(BLUE)========================================$(NC)"
-	@echo "$(BLUE)  RKE2/K3S 集群配置初始化$(NC)"
-	@echo "$(BLUE)========================================$(NC)"
-	@echo ""
-	@if [ ! -f inventory/hosts.ini ]; then \
+setup: ## 初始化配置文件 (用法: make setup [k3s|rke2])
+	@CLUSTER_TYPE=""; \
+	if [ "$(filter k3s,$(MAKECMDGOALS))" = "k3s" ]; then \
+		CLUSTER_TYPE="k3s"; \
+	elif [ "$(filter rke2,$(MAKECMDGOALS))" = "rke2" ]; then \
+		CLUSTER_TYPE="rke2"; \
+	fi; \
+	echo "$(BLUE)========================================$(NC)"; \
+	if [ -n "$$CLUSTER_TYPE" ]; then \
+		echo "$(BLUE)  $$(echo $$CLUSTER_TYPE | tr '[:lower:]' '[:upper:]') 集群配置初始化$(NC)"; \
+	else \
+		echo "$(BLUE)  RKE2/K3S 集群配置初始化$(NC)"; \
+	fi; \
+	echo "$(BLUE)========================================$(NC)"; \
+	echo ""; \
+	if [ ! -f inventory/hosts.ini ]; then \
 		cp inventory/hosts.ini.example inventory/hosts.ini; \
 		echo "$(GREEN)✓ 创建 inventory/hosts.ini$(NC)"; \
 	else \
-		echo "$(YELLOW)⚠ inventory/hosts.ini 已存在，跳过创建$(NC)"; \
-	fi
-	@if [ ! -f inventory/group_vars/all.yml ]; then \
+		echo "$(YELLOW)⚠ inventory/hosts.ini 已存在$(NC)"; \
+	fi; \
+	if [ ! -f inventory/group_vars/all.yml ]; then \
 		cp inventory/group_vars/all.yml.example inventory/group_vars/all.yml; \
 		echo "$(GREEN)✓ 创建 inventory/group_vars/all.yml$(NC)"; \
 	else \
-		echo "$(YELLOW)⚠ inventory/group_vars/all.yml 已存在，跳过创建$(NC)"; \
-	fi
-	@echo ""
-	@echo "$(GREEN)========================================$(NC)"
-	@echo "$(GREEN)  配置文件创建完成！$(NC)"
-	@echo "$(GREEN)========================================$(NC)"
-	@echo ""
+		echo "$(YELLOW)⚠ inventory/group_vars/all.yml 已存在$(NC)"; \
+	fi; \
+	echo ""; \
+	if [ -n "$$CLUSTER_TYPE" ]; then \
+		echo "$(BLUE)自动配置 $$CLUSTER_TYPE 集群...$(NC)"; \
+		echo ""; \
+		if [ "$$CLUSTER_TYPE" = "k3s" ]; then \
+			sed -i.bak 's/cluster_type=rke2/cluster_type=k3s/g' inventory/hosts.ini && rm -f inventory/hosts.ini.bak; \
+			sed -i.bak 's/cluster_type: "rke2"/cluster_type: "k3s"/g' inventory/group_vars/all.yml && rm -f inventory/group_vars/all.yml.bak; \
+			sed -i.bak 's|server_url: ""|server_url: "https://FIRST_NODE_IP:6443"|g' inventory/group_vars/all.yml && rm -f inventory/group_vars/all.yml.bak; \
+			echo "$(GREEN)✓ 集群类型设置为: K3S$(NC)"; \
+			echo "$(GREEN)✓ API Server 端口: 6443$(NC)"; \
+		else \
+			sed -i.bak 's/cluster_type=k3s/cluster_type=rke2/g' inventory/hosts.ini && rm -f inventory/hosts.ini.bak; \
+			sed -i.bak 's/cluster_type: "k3s"/cluster_type: "rke2"/g' inventory/group_vars/all.yml && rm -f inventory/group_vars/all.yml.bak; \
+			sed -i.bak 's|server_url: ""|server_url: "https://FIRST_NODE_IP:9345"|g' inventory/group_vars/all.yml && rm -f inventory/group_vars/all.yml.bak; \
+			echo "$(GREEN)✓ 集群类型设置为: RKE2$(NC)"; \
+			echo "$(GREEN)✓ API Server 端口: 9345$(NC)"; \
+		fi; \
+		sed -i.bak 's/china_region: false/china_region: true/g' inventory/group_vars/all.yml && rm -f inventory/group_vars/all.yml.bak; \
+		echo "$(GREEN)✓ 中国镜像源: 已启用$(NC)"; \
+		echo ""; \
+	fi; \
+	echo "$(GREEN)========================================$(NC)"; \
+	echo "$(GREEN)  配置文件创建完成！$(NC)"; \
+	echo "$(GREEN)========================================$(NC)"; \
+	echo ""
 	@echo "$(YELLOW)📝 下一步：请根据您的环境修改配置文件$(NC)"
 	@echo ""
 	@echo "$(BLUE)━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━$(NC)"
@@ -299,20 +329,22 @@ setup: ## 初始化配置文件
 	@echo "$(BLUE)4️⃣  快速配置示例$(NC)"
 	@echo "$(BLUE)━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━$(NC)"
 	@echo ""
+	@echo "  $(CYAN)🚀 一键配置 (推荐):$(NC)"
+	@echo "    $(GREEN)make setup k3s$(NC)      # K3S 集群 (自动配置)"
+	@echo "    $(GREEN)make setup rke2$(NC)     # RKE2 集群 (自动配置)"
+	@echo "    $(GREEN)make setup$(NC)          # 手动选择类型"
+	@echo ""
 	@echo "  $(CYAN)场景 1: 标准 RKE2 HA 集群 (中国区)$(NC)"
-	@echo "    cluster_type=rke2"
-	@echo "    china_region=true"
-	@echo "    install_version=     # 留空安装最新版"
+	@echo "    $(GREEN)make setup rke2$(NC)"
+	@echo "    # 自动设置: cluster_type=rke2, china_region=true, port=9345"
 	@echo ""
 	@echo "  $(CYAN)场景 2: K3S 轻量级集群$(NC)"
-	@echo "    cluster_type=k3s"
-	@echo "    china_region=false"
-	@echo "    install_version=v1.33.5+k3s1"
+	@echo "    $(GREEN)make setup k3s$(NC)"
+	@echo "    # 自动设置: cluster_type=k3s, china_region=true, port=6443"
 	@echo ""
 	@echo "  $(CYAN)场景 3: 开发测试环境 (单节点)$(NC)"
-	@echo "    cluster_type=k3s"
-	@echo "    china_region=true"
-	@echo "    # 只配置一个 server 节点"
+	@echo "    $(GREEN)make setup k3s$(NC)"
+	@echo "    # 只配置一个 server 节点即可"
 	@echo ""
 	@echo "$(BLUE)━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━$(NC)"
 	@echo "$(BLUE)5️⃣  下一步操作$(NC)"
@@ -393,6 +425,12 @@ logs: ## 查看服务日志
 		ansible -i $(INVENTORY) rke_k3s_servers[0] -m shell -a "journalctl -u rke2-server -n 50 --no-pager" -b 2>/dev/null || \
 			echo "$(YELLOW)无法获取日志$(NC)"; \
 	fi
+
+# 占位符目标 (用于 setup 命令的参数)
+k3s:
+	@:
+rke2:
+	@:
 
 # 默认目标
 .DEFAULT_GOAL := help
