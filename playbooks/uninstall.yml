@@ -68,7 +68,7 @@
         - node_role == 'agent'
       ignore_errors: yes
 
-    - name: 删除配置目录
+    - name: 删除集群特定目录
       file:
         path: "{{ item }}"
         state: absent
@@ -80,6 +80,15 @@
         - "/opt/cni"
         - "/var/lib/cni"
         - "/run/k8s"
+      ignore_errors: yes
+
+    - name: 删除 Rancher 父目录（完全清理）
+      file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - "/etc/rancher"
+        - "/var/lib/rancher"
       ignore_errors: yes
 
     - name: 清理 iptables 规则
@@ -108,6 +117,40 @@
         state: absent
       ignore_errors: yes
 
+    - name: 删除卸载脚本和二进制文件
+      file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - "/usr/local/bin/rke2-uninstall.sh"
+        - "/usr/local/bin/k3s-uninstall.sh"
+        - "/usr/local/bin/k3s-agent-uninstall.sh"
+        - "/usr/local/bin/rke2"
+        - "/usr/local/bin/k3s"
+        - "/usr/bin/rke2"
+        - "/usr/bin/k3s"
+      ignore_errors: yes
+
+    - name: 删除 systemd 服务文件
+      file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - "/etc/systemd/system/rke2-server.service"
+        - "/etc/systemd/system/rke2-agent.service"
+        - "/etc/systemd/system/k3s.service"
+        - "/etc/systemd/system/k3s-agent.service"
+        - "/usr/lib/systemd/system/rke2-server.service"
+        - "/usr/lib/systemd/system/rke2-agent.service"
+        - "/usr/lib/systemd/system/k3s.service"
+        - "/usr/lib/systemd/system/k3s-agent.service"
+      ignore_errors: yes
+
+    - name: 重新加载 systemd
+      systemd:
+        daemon_reload: yes
+      ignore_errors: yes
+
   post_tasks:
     - name: 卸载完成提示
       debug:
@@ -116,10 +159,16 @@
           - "✓ {{ cluster_type | upper }} 卸载完成"
           - ""
           - "已清理："
-          - "  - 服务和进程"
-          - "  - 配置文件"
-          - "  - 数据目录"
-          - "  - 网络接口和规则"
+          - "  ✓ 服务和进程"
+          - "  ✓ 配置文件和目录"
+          - "  ✓ 数据目录（包括 /etc/rancher 和 /var/lib/rancher）"
+          - "  ✓ 网络接口和规则"
+          - "  ✓ 二进制文件和卸载脚本"
+          - "  ✓ Systemd 服务文件"
+          - "  ✓ CNI 配置和插件"
           - ""
-          - "建议重启系统以确保完全清理"
+          - "建议执行："
+          - "  1. 重启系统以确保完全清理: sudo reboot"
+          - "  2. 检查残留进程: ps aux | grep -E '(rke2|k3s)'"
+          - "  3. 检查残留挂载: mount | grep -E '(rke2|k3s)'"
           - "=========================================="

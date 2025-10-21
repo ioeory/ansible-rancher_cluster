@@ -106,9 +106,20 @@ uninstall: ## 卸载集群 (危险操作!)
 		ANSIBLE_ROLES_PATH=$(ANSIBLE_ROLES_PATH) ansible-playbook -i $(INVENTORY) $(PLAYBOOK_DIR)/uninstall.yml \
 			-e "confirm_uninstall=yes" $(EXTRA_ARGS); \
 		echo "$(GREEN)✓ 卸载完成$(NC)"; \
+		echo "$(YELLOW)提示: 运行 'make verify-uninstall' 验证清理结果$(NC)"; \
 	else \
 		echo "$(YELLOW)已取消$(NC)"; \
 	fi
+
+verify-uninstall: ## 验证卸载是否完全清理
+	@echo "$(BLUE)验证卸载清理结果...$(NC)"
+	@if [ ! -f scripts/verify-uninstall.sh ]; then \
+		echo "$(RED)错误: 验证脚本不存在$(NC)"; \
+		exit 1; \
+	fi
+	@echo "$(YELLOW)在所有节点上运行验证...$(NC)"
+	@ansible -i $(INVENTORY) all -m script -a "scripts/verify-uninstall.sh" -b || \
+		echo "$(RED)发现残留文件或进程，请检查日志$(NC)"
 
 # ============================================================================
 # 检查和测试
