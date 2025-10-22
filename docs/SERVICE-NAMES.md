@@ -67,10 +67,10 @@ sudo journalctl -u rke2-agent -f
 我们的 Ansible playbook 会根据集群类型和节点角色自动设置正确的服务名称：
 
 ```yaml
-# roles/rke_k3s/vars/k3s.yml
+# roles/rancher_cluster/vars/k3s.yml
 service_name: "{{ 'k3s' if node_role == 'server' else 'k3s-agent' }}"
 
-# roles/rke_k3s/vars/rke2.yml
+# roles/rancher_cluster/vars/rke2.yml
 service_name: "rke2-{{ node_role }}"
 ```
 
@@ -80,7 +80,7 @@ service_name: "rke2-{{ node_role }}"
 
 **原因：** Agent 节点使用了错误的服务名 `k3s` 而不是 `k3s-agent`
 
-**解决方案：** 已在 `roles/rke_k3s/vars/k3s.yml` 中修复，确保根据 `node_role` 动态设置服务名称
+**解决方案：** 已在 `roles/rancher_cluster/vars/k3s.yml` 中修复，确保根据 `node_role` 动态设置服务名称
 
 ### 如何判断节点类型
 

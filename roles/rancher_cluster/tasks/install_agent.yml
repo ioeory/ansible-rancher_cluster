@@ -1,38 +1,38 @@
 ---
-# Agent 节点安装任务
+# Agent node installation tasks
 
-- name: 获取初始 Server 节点信息
+- name: Get initial server node information
   set_fact:
     init_server_host: "{{ groups['rke_servers'] | map('extract', hostvars) | selectattr('cluster_init', 'defined') | selectattr('cluster_init') | map(attribute='inventory_hostname') | first }}"
 
-- name: 获取初始 Server 节点 IP
+- name: Get initial server node IP
   set_fact:
     init_server_ip: "{{ hostvars[init_server_host]['ansible_host'] }}"
 
-- name: 自动生成 server_url (Agent 节点)
+- name: Auto-generate server_url (Agent node)
   set_fact:
     server_url: "https://{{ init_server_ip }}:{{ '9345' if cluster_type == 'rke2' else '6443' }}"
   when: server_url is not defined or server_url | length == 0 or 'FIRST_NODE_IP' in server_url
 
-- name: 显示 Agent 安装信息
+- name: Display agent installation information
   debug:
     msg:
       - "=========================================="
-      - "开始安装 {{ cluster_type | upper }} Agent 节点"
-      - "初始 Server 节点: {{ init_server_host }}"
-      - "初始 Server IP: {{ init_server_ip }}"
+      - "Installing {{ cluster_type | upper }} Agent node"
+      - "Initial Server Node: {{ init_server_host }}"
+      - "Initial Server IP: {{ init_server_ip }}"
       - "Server URL: {{ server_url }}"
       - "=========================================="
 
-- name: 验证 server_url 参数
+- name: Verify server_url parameter
   assert:
     that:
       - server_url is defined
       - server_url | length > 0
       - "'FIRST_NODE_IP' not in server_url"
-    fail_msg: "无法自动获取 server_url，请检查初始 Server 节点配置或手动配置 server_url"
+    fail_msg: "Failed to auto-retrieve server_url, please check initial server node configuration or manually configure server_url"
 
-- name: 从 Server 节点获取 Token (优先)
+- name: Fetch token from server node (preferred)
   slurp:
     src: "{{ token_file }}"
   delegate_to: "{{ groups['rke_servers'][0] }}"
@@ -40,7 +40,7 @@
   when: cluster_token is not defined or cluster_token | length == 0
   ignore_errors: yes
 
-- name: 设置从 Server 获取的 Token
+- name: Set token fetched from server
   set_fact:
     cluster_token: "{{ server_token_content.content | b64decode | trim }}"
   when:
@@ -48,7 +48,7 @@
     - server_token_content is defined
     - not server_token_content.failed
 
-- name: 检查本地是否存在 Token 文件 (备用方案)
+- name: Check if local token file exists (fallback)
   stat:
     path: "/tmp/{{ cluster_type }}-token.txt"
   delegate_to: localhost
@@ -56,25 +56,25 @@
   register: local_token_file
   when: cluster_token is not defined or cluster_token | length == 0
 
-- name: 从本地文件读取 Token (备用方案)
+- name: Read token from local file (fallback)
   set_fact:
     cluster_token: "{{ lookup('file', '/tmp/' + cluster_type + '-token.txt') | trim }}"
   when:
     - cluster_token is not defined or cluster_token | length == 0
     - local_token_file.stat.exists
 
-- name: 验证 Token 已获取
+- name: Verify token retrieved
   assert:
     that:
       - cluster_token is defined
       - cluster_token | length > 0
-    fail_msg: "无法获取 cluster_token，请确保 Server 节点已安装或手动配置 cluster_token"
+    fail_msg: "Failed to retrieve cluster_token, please ensure server node is installed or manually configure cluster_token"
 
-- name: 显示 Token 获取状态
+- name: Display token retrieval status
   debug:
-    msg: "✓ 成功获取 cluster_token ({{ 'from server node' if (server_token_content is defined and not server_token_content.failed) else 'from local file' }})"
+    msg: "✓ Successfully retrieved cluster_token ({{ 'from server node' if (server_token_content is defined and not server_token_content.failed) else 'from local file' }})"
 
-- name: 更新本地 Token 文件
+- name: Update local token file
   copy:
     content: "{{ cluster_token }}"
     dest: "/tmp/{{ cluster_type }}-token.txt"
@@ -85,20 +85,20 @@
     - cluster_token is defined
     - cluster_token | length > 0
 
-- name: 创建配置目录
+- name: Create configuration directory
   file:
     path: "{{ config_dir }}"
     state: directory
     mode: '0755'
 
-- name: 生成配置文件
+- name: Generate configuration file
   template:
     src: config.yaml.j2
     dest: "{{ config_file }}"
     mode: "{{ config_file_mode }}"
   notify: restart {{ cluster_type }}
 
-- name: 下载安装脚本
+- name: Download installation script
   get_url:
     url: "{{ china_install_script_url if china_region else install_script_url }}"
     dest: "/tmp/{{ cluster_type }}-install.sh"
@@ -107,11 +107,11 @@
   retries: "{{ download_retries }}"
   delay: 5
 
-- name: 设置安装环境变量
+- name: Set installation environment variables
   set_fact:
     install_env: "{{ install_env_vars | default({}) }}"
 
-- name: 添加版本环境变量 (RKE2)
+- name: Add version environment variable (RKE2)
   set_fact:
     install_env: "{{ install_env | combine({'INSTALL_RKE2_VERSION': install_version}) }}"
   when:
@@ -119,7 +119,7 @@
     - install_version is defined
     - install_version | length > 0
 
-- name: 添加版本环境变量 (K3S)
+- name: Add version environment variable (K3S)
   set_fact:
     install_env: "{{ install_env | combine({'INSTALL_K3S_VERSION': install_version}) }}"
   when:
@@ -127,7 +127,7 @@
     - install_version is defined
     - install_version | length > 0
 
-- name: 执行安装脚本 (RKE2)
+- name: Execute installation script (RKE2)
   shell: |
     {% for key, value in install_env.items() %}
     export {{ key }}="{{ value }}"
@@ -139,7 +139,7 @@
   poll: 15
   when: cluster_type == 'rke2'
 
-- name: 执行安装脚本 (K3S Agent)
+- name: Execute installation script (K3S Agent)
   shell: |
     {% for key, value in install_env.items() %}
     export {{ key }}="{{ value }}"
@@ -151,23 +151,23 @@
   poll: 15
   when: cluster_type == 'k3s'
 
-- name: 启动服务
+- name: Start service
   systemd:
     name: "{{ service_name }}"
     state: started
     enabled: yes
     daemon_reload: yes
 
-- name: 等待节点加入集群
+- name: Wait for node to join cluster
   pause:
     seconds: 60
-    prompt: "等待 Agent 节点加入集群..."
+    prompt: "Waiting for Agent node to join cluster..."
 
-- name: Agent 安装完成
+- name: Agent installation completed
   debug:
     msg:
       - "=========================================="
-      - "✓ {{ cluster_type | upper }} Agent 节点安装成功"
-      - "节点已加入集群: {{ server_url }}"
-      - "请在 Server 节点执行 kubectl get nodes 验证"
+      - "✓ {{ cluster_type | upper }} Agent node installed successfully"
+      - "Node joined cluster: {{ server_url }}"
+      - "Please execute 'kubectl get nodes' on server node to verify"
       - "=========================================="

@@ -36,7 +36,9 @@
 
 ## 🚀 快速开始
 
-> 💡 **新手推荐**: 完整的快速部署指南请查看 [QUICK-START-GUIDE.md](QUICK-START-GUIDE.md)
+> 💡 **新手推荐**: 完整的快速部署指南请查看 [QUICK-START-GUIDE.md](docs/QUICK-START-GUIDE.md)
+> 
+> 🌐 **English Version**: [README_EN.md](README_EN.md)
 
 ### 三步部署集群
 

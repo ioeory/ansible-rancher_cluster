@@ -1,7 +1,7 @@
 ---
-# 预检查任务：验证系统环境
+# Preflight checks: Validate system environment
 
-- name: 收集系统信息
+- name: Gather system information
   setup:
     gather_subset:
       - "!all"
@@ -11,17 +11,17 @@
       - "network"
   tags: always
 
-- name: 显示系统信息
+- name: Display system information
   debug:
     msg:
-      - "操作系统: {{ ansible_distribution }} {{ ansible_distribution_version }}"
-      - "内核版本: {{ ansible_kernel }}"
-      - "CPU 架构: {{ ansible_architecture }}"
-      - "CPU 核心数: {{ ansible_processor_vcpus }}"
-      - "内存总量: {{ ansible_memtotal_mb }} MB"
+      - "Operating System: {{ ansible_distribution }} {{ ansible_distribution_version }}"
+      - "Kernel Version: {{ ansible_kernel }}"
+      - "CPU Architecture: {{ ansible_architecture }}"
+      - "CPU Cores: {{ ansible_processor_vcpus }}"
+      - "Total Memory: {{ ansible_memtotal_mb }} MB"
   tags: always
 
-- name: 检查操作系统是否支持
+- name: Check if operating system is supported
   assert:
     that:
       - ansible_os_family in ['Debian', 'RedHat']
@@ -29,49 +29,49 @@
         (ansible_distribution == 'Debian' and ansible_distribution_major_version | int >= 12) or
         (ansible_distribution == 'Ubuntu' and ansible_distribution_version is version('22.04', '>=')) or
         (ansible_distribution in ['CentOS', 'RedHat', 'Rocky', 'AlmaLinux', 'Anolis'] and ansible_distribution_major_version | int >= 8)
-    fail_msg: "不支持的操作系统: {{ ansible_distribution }} {{ ansible_distribution_version }}"
-    success_msg: "操作系统检查通过"
+    fail_msg: "Unsupported operating system: {{ ansible_distribution }} {{ ansible_distribution_version }}"
+    success_msg: "Operating system check passed"
 
-- name: 检查 CPU 架构
+- name: Check CPU architecture
   assert:
     that:
       - ansible_architecture in ['x86_64', 'aarch64', 'arm64']
-    fail_msg: "不支持的 CPU 架构: {{ ansible_architecture }}"
-    success_msg: "CPU 架构检查通过"
+    fail_msg: "Unsupported CPU architecture: {{ ansible_architecture }}"
+    success_msg: "CPU architecture check passed"
 
-- name: 设置架构变量
+- name: Set architecture variable
   set_fact:
     arch_suffix: "{{ 'amd64' if ansible_architecture == 'x86_64' else 'arm64' }}"
 
-- name: 检查内存大小 (最小 2GB)
+- name: Check memory size (minimum 2GB for server)
   assert:
     that:
       - ansible_memtotal_mb >= 2048
-    fail_msg: "内存不足，至少需要 2GB，当前: {{ ansible_memtotal_mb }} MB"
-    success_msg: "内存检查通过"
+    fail_msg: "Insufficient memory, at least 2GB required, current: {{ ansible_memtotal_mb }} MB"
+    success_msg: "Memory check passed"
   when: node_role == "server"
 
-- name: 检查内存大小 (Agent 最小 1GB)
+- name: Check memory size (minimum 1GB for agent)
   assert:
     that:
       - ansible_memtotal_mb >= 1024
-    fail_msg: "内存不足，至少需要 1GB，当前: {{ ansible_memtotal_mb }} MB"
-    success_msg: "内存检查通过"
+    fail_msg: "Insufficient memory, at least 1GB required, current: {{ ansible_memtotal_mb }} MB"
+    success_msg: "Memory check passed"
   when: node_role == "agent"
 
-- name: 检查磁盘空间 (最小 20GB)
+- name: Check disk space (minimum 20GB)
   shell: df -BG / | tail -1 | awk '{print $4}' | sed 's/G//'
   register: disk_space
   changed_when: false
 
-- name: 验证磁盘空间
+- name: Verify disk space
   assert:
     that:
       - disk_space.stdout | int >= 20
-    fail_msg: "磁盘空间不足，至少需要 20GB，当前可用: {{ disk_space.stdout }} GB"
-    success_msg: "磁盘空间检查通过"
+    fail_msg: "Insufficient disk space, at least 20GB required, current available: {{ disk_space.stdout }} GB"
+    success_msg: "Disk space check passed"
 
-- name: 安装必需软件包 (Debian/Ubuntu)
+- name: Install required packages (Debian/Ubuntu)
   apt:
     name:
       - curl
@@ -87,7 +87,7 @@
     update_cache: yes
   when: ansible_os_family == "Debian"
 
-- name: 安装必需软件包 (RHEL/CentOS/Anolis)
+- name: Install required packages (RHEL/CentOS/Anolis)
   yum:
     name:
       - curl
@@ -100,26 +100,26 @@
     state: present
   when: ansible_os_family == "RedHat"
 
-- name: 检查 systemd 版本
+- name: Check systemd version
   command: systemctl --version
   register: systemd_version
   changed_when: false
 
-- name: 验证 systemd 版本
+- name: Verify systemd version
   assert:
     that:
       - systemd_version.stdout_lines[0].split()[1] | int >= 219
-    fail_msg: "systemd 版本过低，需要 >= 219"
-    success_msg: "systemd 版本检查通过"
+    fail_msg: "systemd version too old, requires >= 219"
+    success_msg: "systemd version check passed"
 
-- name: 禁用 swap
+- name: Disable swap
   shell: |
     swapoff -a
     sed -i '/swap/d' /etc/fstab
   when: disable_swap | bool
   changed_when: true
 
-- name: 加载内核模块
+- name: Load kernel modules
   modprobe:
     name: "{{ item }}"
     state: present
@@ -128,7 +128,7 @@
     - br_netfilter
   when: load_kernel_modules | bool
 
-- name: 持久化内核模块
+- name: Persist kernel modules
   copy:
     dest: /etc/modules-load.d/k8s.conf
     content: |
@@ -137,7 +137,7 @@
     mode: '0644'
   when: load_kernel_modules | bool
 
-- name: 配置 sysctl 参数
+- name: Configure sysctl parameters
   sysctl:
     name: "{{ item.name }}"
     value: "{{ item.value }}"
@@ -153,7 +153,7 @@
     - { name: 'vm.swappiness', value: '0' }
   when: configure_sysctl | bool
 
-- name: 检查端口占用情况 (Server)
+- name: Check port availability (Server)
   wait_for:
     host: "{{ ansible_default_ipv4.address }}"
     port: "{{ item.port }}"
@@ -164,9 +164,9 @@
   ignore_errors: yes
   register: port_check
 
-- name: 显示端口检查结果
+- name: Display port check results
   debug:
-    msg: "警告: 端口 {{ item.item.port }} 已被占用 ({{ item.item.description }})"
+    msg: "Warning: Port {{ item.item.port }} is already in use ({{ item.item.description }})"
   loop: "{{ port_check.results | default([]) }}"
   when:
     - node_role == "server"
@@ -175,73 +175,73 @@
   loop_control:
     label: "{{ item.item.port }}"
 
-- name: 检查防火墙状态 (firewalld)
+- name: Check firewall status (firewalld)
   systemd:
     name: firewalld
   register: firewalld_status
   ignore_errors: yes
   when: ansible_os_family == "RedHat"
 
-- name: 检查防火墙状态 (ufw)
+- name: Check firewall status (ufw)
   command: ufw status
   register: ufw_status
   changed_when: false
   ignore_errors: yes
   when: ansible_os_family == "Debian"
 
-- name: 显示防火墙提醒
+- name: Display firewall reminder
   debug:
     msg:
-      - "检测到防火墙正在运行"
-      - "请确保开放必需端口，或设置 configure_firewall=true 自动配置"
+      - "Firewall detected running"
+      - "Please ensure required ports are open, or set configure_firewall=true for automatic configuration"
   when: >
     (ansible_os_family == 'RedHat' and firewalld_status.status.ActiveState == 'active') or
     (ansible_os_family == 'Debian' and 'Status: active' in ufw_status.stdout)
 
-- name: 设置测试 URL (根据集群类型)
+- name: Set test URL (based on cluster type)
   set_fact:
     rancher_mirror_test_url: "{{ 'https://rancher-mirror.rancher.cn/k3s/k3s-install.sh' if cluster_type == 'k3s' else 'https://rancher-mirror.rancher.cn/rke2/install.sh' }}"
-    rancher_mirror_label: "{{ 'Rancher K3S 镜像' if cluster_type == 'k3s' else 'Rancher RKE2 镜像' }}"
+    rancher_mirror_label: "{{ 'Rancher K3S Mirror' if cluster_type == 'k3s' else 'Rancher RKE2 Mirror' }}"
   when: china_region | bool
 
-- name: 测试中国镜像源连通性
+- name: Test China mirror connectivity
   uri:
     url: "{{ item.url }}"
     method: HEAD
     timeout: 5
-    # 接受 2xx (成功), 3xx (重定向), 4xx (客户端错误，但服务器可达)
+    # Accept 2xx (success), 3xx (redirect), 4xx (client error, but server reachable)
     status_code: [200, 201, 202, 203, 204, 205, 206, 207, 208, 226, 301, 302, 303, 304, 305, 306, 307, 308, 400, 401, 402, 403, 404, 405, 406, 407, 408, 409, 410, 411, 412, 413, 414, 415, 416, 417, 418, 421, 422, 423, 424, 425, 426, 428, 429, 431, 451]
   loop:
     - { url: "{{ rancher_mirror_test_url }}", label: "{{ rancher_mirror_label }}" }
-    - { url: "https://mirrors.aliyun.com", label: "阿里云镜像" }
+    - { url: "https://mirrors.aliyun.com", label: "Aliyun Mirror" }
   register: china_network_test
   ignore_errors: yes
   when: china_region | bool
 
-- name: 显示网络测试结果
+- name: Display network test results
   debug:
     msg:
-      - "✓ 中国镜像源连通性测试通过"
+      - "✓ China mirror connectivity test passed"
       - "  - {{ rancher_mirror_label }}: {{ 'OK (HTTP ' + (china_network_test.results[0].status | string) + ')' if (china_network_test.results[0].status >= 200 and china_network_test.results[0].status < 500) else 'FAILED' }}"
-      - "  - 阿里云镜像: {{ 'OK (HTTP ' + (china_network_test.results[1].status | string) + ')' if (china_network_test.results[1].status >= 200 and china_network_test.results[1].status < 500) else 'FAILED' }}"
+      - "  - Aliyun Mirror: {{ 'OK (HTTP ' + (china_network_test.results[1].status | string) + ')' if (china_network_test.results[1].status >= 200 and china_network_test.results[1].status < 500) else 'FAILED' }}"
   when:
     - china_region | bool
     - china_network_test is defined
     - china_network_test.results is defined
 
-- name: 检查是否已安装
+- name: Check if already installed
   stat:
     path: "{{ binary_path }}"
   register: binary_exists
 
-- name: 显示已安装提醒
+- name: Display already installed reminder
   debug:
     msg:
-      - "检测到 {{ cluster_type | upper }} 已安装"
-      - "二进制文件: {{ binary_path }}"
-      - "如需重新安装，请先卸载"
+      - "Detected {{ cluster_type | upper }} already installed"
+      - "Binary path: {{ binary_path }}"
+      - "Please uninstall first if you need to reinstall"
   when: binary_exists.stat.exists
 
-- name: 预检查完成
+- name: Preflight check completed
   debug:
-    msg: "✓ 所有预检查项目通过，系统满足安装要求"
+    msg: "✓ All preflight checks passed, system meets installation requirements"

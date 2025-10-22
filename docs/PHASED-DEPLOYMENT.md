@@ -53,7 +53,7 @@ failed to validate token: token CA hash does not match the Cluster CA certificat
   hosts: all  # ❌ 所有节点并行执行
   become: yes
   roles:
-    - role: rke_k3s
+    - role: rancher_cluster
 ```
 
 #### 修改后（已修复）
@@ -64,7 +64,7 @@ failed to validate token: token CA hash does not match the Cluster CA certificat
   hosts: all
   become: yes
   roles:
-    - role: rke_k3s
+    - role: rancher_cluster
       when:
         - node_role == 'server'
         - cluster_init | bool
@@ -78,7 +78,7 @@ failed to validate token: token CA hash does not match the Cluster CA certificat
   hosts: all
   become: yes
   roles:
-    - role: rke_k3s
+    - role: rancher_cluster
       when:
         - node_role == 'server'
         - not (cluster_init | default(false) | bool)
@@ -88,7 +88,7 @@ failed to validate token: token CA hash does not match the Cluster CA certificat
   hosts: all
   become: yes
   roles:
-    - role: rke_k3s
+    - role: rancher_cluster
       when: node_role == 'agent'
 ```
 
@@ -180,10 +180,10 @@ ansible-playbook -i inventory/hosts.ini playbooks/install.yml \
 集群类型: K3S
 ========================================
 
-TASK [rke_k3s : 生成配置文件] ******
+TASK [rancher_cluster : 生成配置文件] ******
 ok: [node1]
 
-TASK [rke_k3s : 执行安装脚本 (K3S Server)] ******
+TASK [rancher_cluster : 执行安装脚本 (K3S Server)] ******
 changed: [node1]
 
 TASK [等待初始节点就绪] ******
@@ -194,10 +194,10 @@ Pausing for 10 seconds...
 目标主机: node2
 ========================================
 
-TASK [rke_k3s : 从初始 Server 节点获取 Token] ******
+TASK [rancher_cluster : 从初始 Server 节点获取 Token] ******
 ok: [node2]
 
-TASK [rke_k3s : 显示 Token 获取状态] ******
+TASK [rancher_cluster : 显示 Token 获取状态] ******
 ok: [node2] => {
     "msg": "✓ 成功获取 cluster_token (from init server node)"
 }
@@ -307,7 +307,7 @@ ansible-playbook -i inventory/hosts.ini playbooks/install-parallel.yml
 # 阶段 2: node2 和 node3 并行部署
 - hosts: all
   roles:
-    - role: rke_k3s
+    - role: rancher_cluster
       when: 
         - node_role == 'server'
         - not cluster_init

@@ -1,44 +1,44 @@
 ---
-# Server 节点安装任务
+# Server node installation tasks
 
-- name: 获取初始 Server 节点信息
+- name: Get initial server node information
   set_fact:
     init_server_host: "{{ groups['rke_servers'] | map('extract', hostvars) | selectattr('cluster_init', 'defined') | selectattr('cluster_init') | map(attribute='inventory_hostname') | first }}"
   when: not cluster_init | bool
 
-- name: 获取初始 Server 节点 IP
+- name: Get initial server node IP
   set_fact:
     init_server_ip: "{{ hostvars[init_server_host]['ansible_host'] }}"
   when: not cluster_init | bool
 
-- name: 自动生成 server_url (非初始节点)
+- name: Auto-generate server_url (non-init nodes)
   set_fact:
     server_url: "https://{{ init_server_ip }}:{{ '9345' if cluster_type == 'rke2' else '6443' }}"
   when:
     - not cluster_init | bool
     - server_url is not defined or server_url | length == 0 or 'FIRST_NODE_IP' in server_url
 
-- name: 显示 Server 安装信息
+- name: Display server installation information
   debug:
     msg:
       - "=========================================="
-      - "开始安装 {{ cluster_type | upper }} Server 节点"
-      - "集群初始化: {{ cluster_init }}"
-      - "初始节点: {{ init_server_host | default('N/A') }}"
-      - "初始节点 IP: {{ init_server_ip | default('N/A') }}"
+      - "Installing {{ cluster_type | upper }} Server node"
+      - "Cluster Init: {{ cluster_init }}"
+      - "Init Node: {{ init_server_host | default('N/A') }}"
+      - "Init Node IP: {{ init_server_ip | default('N/A') }}"
       - "Server URL: {{ server_url | default('N/A', true) }}"
       - "=========================================="
 
-- name: 验证 server_url (非初始节点)
+- name: Verify server_url (non-init nodes)
   assert:
     that:
       - server_url is defined
       - server_url | length > 0
       - "'FIRST_NODE_IP' not in server_url"
-    fail_msg: "无法自动获取 server_url，请检查初始节点配置或手动配置 server_url"
+    fail_msg: "Failed to auto-retrieve server_url, please check init node configuration or manually configure server_url"
   when: not cluster_init | bool
 
-- name: 从初始 Server 节点获取 Token (非初始节点)
+- name: Fetch token from initial server node (non-init nodes)
   slurp:
     src: "{{ token_file }}"
   delegate_to: "{{ groups['rke_servers'] | map('extract', hostvars) | selectattr('cluster_init', 'defined') | selectattr('cluster_init') | map(attribute='inventory_hostname') | first }}"
@@ -48,7 +48,7 @@
     - cluster_token is not defined or cluster_token | length == 0
   ignore_errors: yes
 
-- name: 设置从 Server 获取的 Token (非初始节点)
+- name: Set token fetched from server (non-init nodes)
   set_fact:
     cluster_token: "{{ server_token_content.content | b64decode | trim }}"
   when:
@@ -57,7 +57,7 @@
     - server_token_content is defined
     - not server_token_content.failed
 
-- name: 检查本地是否存在 Token 文件 (备用方案)
+- name: Check if local token file exists (fallback)
   stat:
     path: "/tmp/{{ cluster_type }}-token.txt"
   delegate_to: localhost
@@ -67,7 +67,7 @@
     - not cluster_init | bool
     - cluster_token is not defined or cluster_token | length == 0
 
-- name: 从本地文件读取 Token (备用方案)
+- name: Read token from local file (fallback)
   set_fact:
     cluster_token: "{{ lookup('file', '/tmp/' + cluster_type + '-token.txt') | trim }}"
   when:
@@ -75,20 +75,20 @@
     - cluster_token is not defined or cluster_token | length == 0
     - local_token_file.stat.exists
 
-- name: 验证 Token 已获取 (非初始节点)
+- name: Verify token retrieved (non-init nodes)
   assert:
     that:
       - cluster_token is defined
       - cluster_token | length > 0
-    fail_msg: "无法获取 cluster_token，请确保初始 Server 节点已安装或手动配置 cluster_token"
+    fail_msg: "Failed to retrieve cluster_token, please ensure initial server node is installed or manually configure cluster_token"
   when: not cluster_init | bool
 
-- name: 显示 Token 获取状态 (非初始节点)
+- name: Display token retrieval status (non-init nodes)
   debug:
-    msg: "✓ 成功获取 cluster_token ({{ 'from init server node' if (server_token_content is defined and not server_token_content.failed) else 'from local file' }})"
+    msg: "✓ Successfully retrieved cluster_token ({{ 'from init server node' if (server_token_content is defined and not server_token_content.failed) else 'from local file' }})"
   when: not cluster_init | bool
 
-- name: 更新本地 Token 文件 (非初始节点)
+- name: Update local token file (non-init nodes)
   copy:
     content: "{{ cluster_token }}"
     dest: "/tmp/{{ cluster_type }}-token.txt"
@@ -100,20 +100,20 @@
     - cluster_token is defined
     - cluster_token | length > 0
 
-- name: 创建配置目录
+- name: Create configuration directory
   file:
     path: "{{ config_dir }}"
     state: directory
     mode: '0755'
 
-- name: 生成配置文件
+- name: Generate configuration file
   template:
     src: config.yaml.j2
     dest: "{{ config_file }}"
     mode: "{{ config_file_mode }}"
   notify: restart {{ cluster_type }}
 
-- name: 下载安装脚本
+- name: Download installation script
   get_url:
     url: "{{ china_install_script_url if china_region else install_script_url }}"
     dest: "/tmp/{{ cluster_type }}-install.sh"
@@ -122,11 +122,11 @@
   retries: "{{ download_retries }}"
   delay: 5
 
-- name: 设置安装环境变量
+- name: Set installation environment variables
   set_fact:
     install_env: "{{ install_env_vars | default({}) }}"
 
-- name: 添加版本环境变量 (RKE2)
+- name: Add version environment variable (RKE2)
   set_fact:
     install_env: "{{ install_env | combine({'INSTALL_RKE2_VERSION': install_version}) }}"
   when:
@@ -134,7 +134,7 @@
     - install_version is defined
     - install_version | length > 0
 
-- name: 添加版本环境变量 (K3S)
+- name: Add version environment variable (K3S)
   set_fact:
     install_env: "{{ install_env | combine({'INSTALL_K3S_VERSION': install_version}) }}"
   when:
@@ -142,7 +142,7 @@
     - install_version is defined
     - install_version | length > 0
 
-- name: 执行安装脚本 (RKE2)
+- name: Execute installation script (RKE2)
   shell: |
     {% for key, value in install_env.items() %}
     export {{ key }}="{{ value }}"
@@ -154,7 +154,7 @@
   poll: 15
   when: cluster_type == 'rke2'
 
-- name: 执行安装脚本 (K3S Server)
+- name: Execute installation script (K3S Server)
   shell: |
     {% for key, value in install_env.items() %}
     export {{ key }}="{{ value }}"
@@ -166,43 +166,43 @@
   poll: 15
   when: cluster_type == 'k3s'
 
-- name: 启动服务
+- name: Start service
   systemd:
     name: "{{ service_name }}"
     state: started
     enabled: yes
     daemon_reload: yes
 
-- name: 等待服务就绪
+- name: Wait for service ready
   wait_for:
     path: "{{ kubeconfig_path }}"
     timeout: "{{ service_wait_timeout }}"
   when: cluster_init | bool
 
-- name: 等待 API Server 就绪
+- name: Wait for API server ready
   wait_for:
     host: "{{ ansible_default_ipv4.address }}"
     port: "{{ api_port }}"
     timeout: "{{ service_wait_timeout }}"
 
-- name: 获取节点 Token (初始节点)
+- name: Retrieve node token (init node)
   slurp:
     src: "{{ token_file }}"
   register: node_token_content
   when: cluster_init | bool
 
-- name: 显示节点 Token (初始节点)
+- name: Display node token (init node)
   debug:
     msg:
       - "=========================================="
-      - "集群 Token (请妥善保存，用于其他节点加入):"
+      - "Cluster Token (save it for other nodes to join):"
       - "{{ node_token_content.content | b64decode | trim }}"
       - "=========================================="
   when:
     - cluster_init | bool
     - node_token_content is defined
 
-- name: 保存 Token 到本地
+- name: Save token to local file
   copy:
     content: "{{ node_token_content.content | b64decode | trim }}"
     dest: "/tmp/{{ cluster_type }}-token.txt"
@@ -213,24 +213,24 @@
     - cluster_init | bool
     - node_token_content is defined
 
-- name: 配置 kubectl 环境变量
+- name: Configure kubectl environment variables
   blockinfile:
     path: "/root/.bashrc"
     block: |
-      # {{ cluster_type | upper }} kubectl 配置
+      # {{ cluster_type | upper }} kubectl configuration
       export KUBECONFIG={{ kubeconfig_path }}
       export PATH=$PATH:/var/lib/rancher/{{ cluster_type }}/bin
     marker: "# {mark} ANSIBLE MANAGED BLOCK - {{ cluster_type | upper }}"
     create: yes
 
-- name: 创建 kubectl 符号链接 (RKE2)
+- name: Create kubectl symlink (RKE2)
   file:
     src: "/var/lib/rancher/rke2/bin/kubectl"
     dest: "/usr/local/bin/kubectl"
     state: link
   when: cluster_type == 'rke2'
 
-- name: 验证节点状态
+- name: Verify node status
   shell: |
     export KUBECONFIG={{ kubeconfig_path }}
     {{ kubectl_path }} get nodes
@@ -240,15 +240,15 @@
   until: node_status.rc == 0
   changed_when: false
 
-- name: 显示节点状态
+- name: Display node status
   debug:
     var: node_status.stdout_lines
 
-- name: Server 安装完成
+- name: Server installation completed
   debug:
     msg:
       - "=========================================="
-      - "✓ {{ cluster_type | upper }} Server 节点安装成功"
+      - "✓ {{ cluster_type | upper }} Server node installed successfully"
       - "Kubeconfig: {{ kubeconfig_path }}"
       - "API Server: https://{{ ansible_default_ipv4.address }}:{{ api_port }}"
       - "=========================================="

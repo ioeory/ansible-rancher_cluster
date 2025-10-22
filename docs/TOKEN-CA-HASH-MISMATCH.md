@@ -103,12 +103,12 @@ ansible -i inventory/hosts.ini node2,node3,worker1 -b -m shell -a "systemctl res
 
 #### 修改的文件
 
-1. **`roles/rke_k3s/tasks/install_server.yml`**
+1. **`roles/rancher_cluster/tasks/install_server.yml`**
    - 优先从初始节点实时获取 token
    - 本地文件作为备用方案
    - 获取后更新本地文件
 
-2. **`roles/rke_k3s/tasks/install_agent.yml`**
+2. **`roles/rancher_cluster/tasks/install_agent.yml`**
    - 优先从 Server 节点实时获取 token
    - 本地文件作为备用方案
    - 获取后更新本地文件

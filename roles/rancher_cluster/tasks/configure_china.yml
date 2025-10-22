@@ -1,22 +1,22 @@
 ---
-# 中国大陆特殊配置任务
+# China region specific configuration tasks
 
-- name: 显示中国区配置信息
+- name: Display China region configuration information
   debug:
     msg:
       - "=========================================="
-      - "启用中国大陆镜像源配置"
-      - "安装脚本: {{ china_install_script_url }}"
-      - "镜像加速: {{ enable_registry_mirrors }}"
+      - "Enabling China region mirror configuration"
+      - "Installation script: {{ china_install_script_url }}"
+      - "Registry mirrors: {{ enable_registry_mirrors }}"
       - "=========================================="
 
-- name: 创建配置目录
+- name: Create configuration directory
   file:
     path: "{{ config_dir }}"
     state: directory
     mode: '0755'
 
-- name: 配置 Containerd 镜像加速
+- name: Configure Containerd registry mirrors
   template:
     src: registries.yaml.j2
     dest: "{{ registries_config }}"
@@ -24,15 +24,15 @@
   when: enable_registry_mirrors | bool
   notify: restart {{ cluster_type }}
 
-- name: 设置中国镜像环境变量
+- name: Set China mirror environment variables
   set_fact:
     install_env_vars: "{{ china_mirror_env }}"
 
-- name: 显示镜像配置
+- name: Display mirror configuration
   debug:
     msg:
-      - "Containerd 镜像源配置文件: {{ registries_config }}"
-      - "已配置的镜像仓库:"
+      - "Containerd registry configuration file: {{ registries_config }}"
+      - "Configured registries:"
       - "  - Docker Hub: {{ registry_mirrors['docker.io'] | join(', ') }}"
       - "  - Kubernetes: {{ registry_mirrors['registry.k8s.io'] | join(', ') }}"
       - "  - GitHub CR: {{ registry_mirrors['ghcr.io'] | join(', ') }}"

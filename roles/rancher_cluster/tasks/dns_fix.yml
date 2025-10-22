@@ -1,18 +1,18 @@
 ---
-# DNS 配置修复任务
-# 解决 RKE2/K3S 安装后 DNS 被修改的问题
+# DNS configuration fix tasks
+# Resolves DNS modification issues after RKE2/K3S installation
 
-- name: 检查 systemd-resolved 状态
+- name: Check systemd-resolved status
   systemd:
     name: systemd-resolved
   register: resolved_status
   ignore_errors: yes
 
-- name: 显示 systemd-resolved 状态
+- name: Display systemd-resolved status
   debug:
-    msg: "systemd-resolved 状态: {{ resolved_status.status.ActiveState | default('不存在') }}"
+    msg: "systemd-resolved status: {{ resolved_status.status.ActiveState | default('not found') }}"
 
-- name: 备份原始 /etc/resolv.conf
+- name: Backup original /etc/resolv.conf
   copy:
     src: /etc/resolv.conf
     dest: /etc/resolv.conf.backup-{{ ansible_date_time.epoch }}
@@ -21,40 +21,40 @@
   when: preserve_dns_config | default(false)
   ignore_errors: yes
 
-- name: 检查 /etc/resolv.conf 是否为符号链接
+- name: Check if /etc/resolv.conf is a symlink
   stat:
     path: /etc/resolv.conf
   register: resolv_conf_stat
 
-- name: 显示 resolv.conf 信息
+- name: Display resolv.conf information
   debug:
     msg: 
-      - "resolv.conf 是符号链接: {{ resolv_conf_stat.stat.islnk | default(false) }}"
-      - "目标路径: {{ resolv_conf_stat.stat.lnk_source | default('N/A') }}"
+      - "resolv.conf is symlink: {{ resolv_conf_stat.stat.islnk | default(false) }}"
+      - "Target path: {{ resolv_conf_stat.stat.lnk_source | default('N/A') }}"
 
-# 处理方案 1: 禁用 systemd-resolved (如果用户选择)
-- name: 禁用 systemd-resolved (如果配置)
+# Solution 1: Disable systemd-resolved (if user chooses)
+- name: Disable systemd-resolved (if configured)
   block:
-    - name: 停止并禁用 systemd-resolved
+    - name: Stop and disable systemd-resolved
       systemd:
         name: systemd-resolved
         state: stopped
         enabled: no
       
-    - name: 删除 resolv.conf 符号链接
+    - name: Remove resolv.conf symlink
       file:
         path: /etc/resolv.conf
         state: absent
       when: resolv_conf_stat.stat.islnk | default(false)
     
-    - name: 创建静态 resolv.conf
+    - name: Create static resolv.conf
       template:
         src: resolv.conf.j2
         dest: /etc/resolv.conf
         mode: '0644'
       when: static_dns_servers | default([]) | length > 0
 
-    - name: 设置 resolv.conf 为不可变 (可选)
+    - name: Set resolv.conf as immutable (optional)
       file:
         path: /etc/resolv.conf
         attr: i
@@ -68,38 +68,38 @@
     - resolved_status.status is defined
     - resolved_status.status.LoadState == "loaded"
 
-# 处理方案 2: 配置 systemd-resolved 不管理 DNS
-- name: 配置 systemd-resolved (保持运行但不管理 DNS)
+# Solution 2: Configure systemd-resolved to not manage DNS
+- name: Configure systemd-resolved (keep running but don't manage DNS)
   block:
-    - name: 创建 systemd-resolved 配置目录
+    - name: Create systemd-resolved configuration directory
       file:
         path: /etc/systemd/resolved.conf.d
         state: directory
         mode: '0755'
 
-    - name: 配置 systemd-resolved 不修改 resolv.conf
+    - name: Configure systemd-resolved to not modify resolv.conf
       copy:
         content: |
           [Resolve]
-          # 不修改 /etc/resolv.conf
+          # Do not modify /etc/resolv.conf
           DNSStubListener=no
         dest: /etc/systemd/resolved.conf.d/disable-stub.conf
         mode: '0644'
       register: resolved_config
 
-    - name: 重启 systemd-resolved
+    - name: Restart systemd-resolved
       systemd:
         name: systemd-resolved
         state: restarted
       when: resolved_config.changed
 
-    - name: 删除 resolv.conf 符号链接
+    - name: Remove resolv.conf symlink
       file:
         path: /etc/resolv.conf
         state: absent
       when: resolv_conf_stat.stat.islnk | default(false)
 
-    - name: 创建静态 resolv.conf
+    - name: Create static resolv.conf
       template:
         src: resolv.conf.j2
         dest: /etc/resolv.conf
@@ -112,39 +112,38 @@
     - resolved_status.status is defined
     - resolved_status.status.LoadState == "loaded"
 
-- name: 显示 DNS 配置建议
+- name: Display DNS configuration recommendations
   debug:
     msg:
       - "=========================================="
-      - "⚠️  DNS 配置说明"
+      - "⚠️  DNS Configuration Notes"
       - "=========================================="
       - ""
-      - "RKE2/K3S 不会直接修改主机的 /etc/resolv.conf"
-      - "但以下情况可能导致 DNS 被修改:"
+      - "RKE2/K3S does not directly modify host's /etc/resolv.conf"
+      - "However, the following situations may cause DNS to be modified:"
       - ""
-      - "1. systemd-resolved 服务"
-      - "   - 如果启用，会自动管理 /etc/resolv.conf"
-      - "   - 建议: 禁用或配置不干预 DNS"
+      - "1. systemd-resolved service"
+      - "   - If enabled, will automatically manage /etc/resolv.conf"
+      - "   - Recommendation: Disable or configure not to interfere with DNS"
       - ""
       - "2. NetworkManager"
-      - "   - 可能会覆盖 DNS 配置"
-      - "   - 建议: 配置 NetworkManager 不管理 DNS"
+      - "   - May overwrite DNS configuration"
+      - "   - Recommendation: Configure NetworkManager not to manage DNS"
       - ""
-      - "3. DHCP 客户端"
-      - "   - 可能从 DHCP 服务器获取 DNS"
-      - "   - 建议: 使用静态 DNS 配置"
+      - "3. DHCP client"
+      - "   - May obtain DNS from DHCP server"
+      - "   - Recommendation: Use static DNS configuration"
       - ""
-      - "当前配置选项:"
+      - "Current configuration options:"
       - "  - disable_systemd_resolved: {{ disable_systemd_resolved | default(false) }}"
       - "  - configure_systemd_resolved: {{ configure_systemd_resolved | default(false) }}"
       - "  - preserve_dns_config: {{ preserve_dns_config | default(false) }}"
       - "  - static_dns_servers: {{ static_dns_servers | default([]) }}"
       - ""
-      - "建议: 在 group_vars/all.yml 中配置:"
-      - "  disable_systemd_resolved: true  # 禁用 systemd-resolved"
+      - "Recommendation: Configure in group_vars/all.yml:"
+      - "  disable_systemd_resolved: true  # Disable systemd-resolved"
       - "  static_dns_servers:"
       - "    - 8.8.8.8"
       - "    - 114.114.114.114"
       - "=========================================="
   run_once: yes
-

@@ -1,58 +1,58 @@
 ---
-# etcd 备份任务
+# etcd backup tasks
 
-- name: 检查节点角色
+- name: Check node role
   assert:
     that:
       - node_role == 'server'
-    fail_msg: "etcd 备份只能在 Server 节点上执行，当前节点角色: {{ node_role }}"
+    fail_msg: "etcd backup can only be executed on Server nodes, current node role: {{ node_role }}"
 
-- name: 显示备份信息
+- name: Display backup information
   debug:
     msg:
       - "=========================================="
-      - "开始备份 etcd 数据"
-      - "备份目录: {{ backup_dir }}"
+      - "Starting etcd data backup"
+      - "Backup directory: {{ backup_dir }}"
       - "=========================================="
 
-- name: 检查服务状态
+- name: Check service status
   systemd:
     name: "{{ service_name }}"
   register: service_status
 
-- name: 验证服务运行
+- name: Verify service is running
   assert:
     that:
       - service_status.status.ActiveState == "active"
-    fail_msg: "{{ cluster_type | upper }} 服务未运行，无法执行备份"
+    fail_msg: "{{ cluster_type | upper }} service is not running, cannot perform backup"
 
-- name: 创建备份目录
+- name: Create backup directory
   file:
     path: "{{ backup_dir }}"
     state: directory
     mode: '0700'
 
-- name: 执行 etcd 快照备份
+- name: Execute etcd snapshot backup
   shell: |
     {{ backup_command }}
   register: backup_result
   changed_when: true
 
-- name: 获取最新备份文件
+- name: Get latest backup file
   find:
     paths: "{{ backup_dir }}"
     patterns: "snapshot-*"
     file_type: file
   register: backup_files
 
-- name: 显示备份文件
+- name: Display backup file
   debug:
     msg:
-      - "最新备份文件:"
+      - "Latest backup file:"
       - "{{ backup_files.files | sort(attribute='mtime', reverse=true) | first | json_query('path') }}"
   when: backup_files.matched > 0
 
-- name: 清理旧备份
+- name: Cleanup old backups
   shell: |
     cd {{ backup_dir }}
     ls -t snapshot-* 2>/dev/null | tail -n +{{ etcd_snapshot_retention + 1 }} | xargs -r rm -f
@@ -60,18 +60,18 @@
   changed_when: true
   ignore_errors: yes
 
-- name: 备份统计
+- name: Backup statistics
   find:
     paths: "{{ backup_dir }}"
     patterns: "snapshot-*"
     file_type: file
   register: backup_count
 
-- name: 显示备份统计
+- name: Display backup statistics
   debug:
     msg:
       - "=========================================="
-      - "✓ 备份完成"
-      - "当前保留备份数: {{ backup_count.matched }}"
-      - "备份目录: {{ backup_dir }}"
+      - "✓ Backup completed"
+      - "Current retained backups: {{ backup_count.matched }}"
+      - "Backup directory: {{ backup_dir }}"
       - "=========================================="

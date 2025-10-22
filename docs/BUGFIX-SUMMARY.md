@@ -2,10 +2,10 @@
 
 ## 问题描述
 
-在执行 `make backup` 等命令时，遇到 Ansible 无法找到 `rke_k3s` role 的错误：
+在执行 `make backup` 等命令时，遇到 Ansible 无法找到 `rancher_cluster` role 的错误：
 
 ```
-the role 'rke_k3s' was not found in /mnt/c/Users/ioe/Nextcloud/Documents/doocom/CICD/Ranche Kubernetes/playbooks/roles
+the role 'rancher_cluster' was not found in /mnt/c/Users/ioe/Nextcloud/Documents/doocom/CICD/Ranche Kubernetes/playbooks/roles
 ```
 
 ## 根本原因
@@ -50,11 +50,11 @@ ANSIBLE_ROLES_PATH=$(ANSIBLE_ROLES_PATH) ansible-playbook -i $(INVENTORY) ...
 ```yaml
 tasks:
   - name: 加载集群类型特定变量
-    include_vars: "../roles/rke_k3s/vars/{{ cluster_type }}.yml"
+    include_vars: "../roles/rancher_cluster/vars/{{ cluster_type }}.yml"
   
   - name: 执行备份
     include_role:
-      name: rke_k3s
+      name: rancher_cluster
       tasks_from: backup
 ```
 
@@ -67,7 +67,7 @@ tasks:
 ```yaml
 tasks:
   - name: 加载集群类型特定变量
-    include_vars: "../roles/rke_k3s/vars/{{ cluster_type }}.yml"
+    include_vars: "../roles/rancher_cluster/vars/{{ cluster_type }}.yml"
   
   - name: 设置升级标志
     set_fact:
@@ -75,7 +75,7 @@ tasks:
   
   - name: 执行升级
     include_role:
-      name: rke_k3s
+      name: rancher_cluster
       tasks_from: upgrade
 ```
 

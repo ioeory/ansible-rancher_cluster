@@ -24,7 +24,7 @@
         - cluster_init | bool
 
   roles:
-    - role: rke_k3s
+    - role: rancher_cluster
       when:
         - node_role == 'server'
         - cluster_init | bool
@@ -60,7 +60,7 @@
         - not (cluster_init | default(false) | bool)
 
   roles:
-    - role: rke_k3s
+    - role: rancher_cluster
       when:
         - node_role == 'server'
         - not (cluster_init | default(false) | bool)
@@ -95,7 +95,7 @@
       when: node_role == 'agent'
 
   roles:
-    - role: rke_k3s
+    - role: rancher_cluster
       when: node_role == 'agent'
 
   post_tasks:

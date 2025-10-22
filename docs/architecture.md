@@ -78,7 +78,7 @@
 ### Role 架构
 
 ```
-roles/rke_k3s/
+roles/rancher_cluster/
 │
 ├── defaults/main.yml           # 默认变量（用户可覆盖）
 │

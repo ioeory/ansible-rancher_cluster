@@ -36,7 +36,7 @@
 
   tasks:
     - name: 加载集群类型变量
-      include_vars: "../roles/rke_k3s/vars/{{ cluster_type }}.yml"
+      include_vars: "../roles/rancher_cluster/vars/{{ cluster_type }}.yml"
 
     - name: 停止服务
       systemd:

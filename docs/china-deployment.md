@@ -153,7 +153,7 @@ mirrors:
 
 1. 登录阿里云容器镜像服务：https://cr.console.aliyun.com/
 2. 获取专属加速器地址（例如：`https://xxxxx.mirror.aliyuncs.com`）
-3. 修改配置文件 `roles/rke_k3s/vars/china_mirrors.yml`:
+3. 修改配置文件 `roles/rancher_cluster/vars/china_mirrors.yml`:
 
 ```yaml
 registry_mirrors:

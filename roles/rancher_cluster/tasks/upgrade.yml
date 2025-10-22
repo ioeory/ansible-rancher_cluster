@@ -1,42 +1,42 @@
 ---
-# 集群升级任务
+# Cluster upgrade tasks
 
-- name: 加载集群类型特定变量
-  include_vars: "../roles/rke_k3s/vars/{{ cluster_type }}.yml"
+- name: Load cluster-specific variables
+  include_vars: "../roles/rancher_cluster/vars/{{ cluster_type }}.yml"
 
-- name: 显示升级信息
+- name: Display upgrade information
   debug:
     msg:
       - "=========================================="
-      - "开始升级 {{ cluster_type | upper }}"
-      - "目标版本: {{ install_version | default('最新版本', true) }}"
+      - "Starting {{ cluster_type | upper }} upgrade"
+      - "Target version: {{ install_version | default('Latest version', true) }}"
       - "=========================================="
 
-- name: 获取当前版本
+- name: Get current version
   shell: |
     {{ binary_path }} --version | head -1
   register: current_version
   changed_when: false
 
-- name: 显示当前版本
+- name: Display current version
   debug:
-    msg: "当前版本: {{ current_version.stdout }}"
+    msg: "Current version: {{ current_version.stdout }}"
 
-- name: 升级前备份
+- name: Pre-upgrade backup
   include_tasks: backup.yml
   when: 
     - backup_before_upgrade | bool
     - node_role == 'server'
 
-- name: 确认升级
+- name: Confirm upgrade
   pause:
-    prompt: "确认升级集群？按 Enter 继续，Ctrl+C 取消"
+    prompt: "Confirm cluster upgrade? Press Enter to continue, Ctrl+C to cancel"
   when: 
     - not ansible_check_mode
     - not (skip_upgrade_confirmation | default(false))
   run_once: yes
 
-- name: 下载新版本安装脚本
+- name: Download new version installation script
   get_url:
     url: "{{ china_install_script_url if china_region else install_script_url }}"
     dest: "/tmp/{{ cluster_type }}-install.sh"
@@ -46,26 +46,26 @@
   retries: "{{ download_retries }}"
   delay: 5
 
-- name: 设置安装环境变量（基础）
+- name: Set installation environment variables (base)
 
   set_fact:
     install_env: {}
 
-- name: 添加中国镜像源环境变量 (RKE2)
+- name: Add China mirror environment variables (RKE2)
   set_fact:
     install_env: "{{ install_env | combine(china_mirror_env) }}"
   when:
     - china_region | bool
     - cluster_type == 'rke2'
 
-- name: 添加中国镜像源环境变量 (K3S)
+- name: Add China mirror environment variables (K3S)
   set_fact:
     install_env: "{{ install_env | combine(china_mirror_env) }}"
   when:
     - china_region | bool
     - cluster_type == 'k3s'
 
-- name: 添加版本环境变量 (RKE2)
+- name: Add version environment variable (RKE2)
   set_fact:
     install_env: "{{ install_env | combine({'INSTALL_RKE2_VERSION': install_version}) }}"
   when:
@@ -73,7 +73,7 @@
     - install_version is defined
     - install_version | length > 0
 
-- name: 添加版本环境变量 (K3S)
+- name: Add version environment variable (K3S)
   set_fact:
     install_env: "{{ install_env | combine({'INSTALL_K3S_VERSION': install_version}) }}"
   when:
@@ -81,7 +81,7 @@
     - install_version is defined
     - install_version | length > 0
 
-- name: 执行升级 (RKE2)
+- name: Execute upgrade (RKE2)
   shell: |
     {% for key, value in install_env.items() %}
     export {{ key }}="{{ value }}"
@@ -92,7 +92,7 @@
   when: cluster_type == 'rke2'
   register: upgrade_result
 
-- name: 执行升级 (K3S)
+- name: Execute upgrade (K3S)
   shell: |
     {% for key, value in install_env.items() %}
     export {{ key }}="{{ value }}"
@@ -103,7 +103,7 @@
   when: cluster_type == 'k3s'
   register: upgrade_result
 
-- name: 重启服务
+- name: Restart service
   systemd:
     name: "{{ service_name }}"
     state: restarted
@@ -111,12 +111,12 @@
   register: restart_result
   failed_when: false
 
-- name: 初始等待（给服务启动时间）
+- name: Initial wait (give service time to start)
   pause:
     seconds: 30
   when: restart_result.failed | default(false)
 
-- name: 智能等待服务状态（接受 active 或 activating）
+- name: Smart wait for service status (accept active or activating)
   shell: |
     systemctl is-active {{ service_name }} || systemctl status {{ service_name }} | grep -q "activating"
   register: service_check
@@ -126,7 +126,7 @@
   changed_when: false
   failed_when: false
 
-- name: 等待 API Server 端口就绪（Server 节点）
+- name: Wait for API Server port ready (Server node)
   wait_for:
     host: "{{ ansible_default_ipv4.address }}"
     port: "{{ api_port }}"
@@ -136,58 +136,58 @@
     - service_check.rc == 0
   ignore_errors: yes
 
-- name: 获取服务详细状态（如果仍有问题）
+- name: Get detailed service status (if still having issues)
   shell: systemctl status {{ service_name }} --no-pager -l
   register: service_status_detail
   changed_when: false
   when: service_check.rc != 0
 
-- name: 显示服务状态信息
+- name: Display service status information
   debug:
     msg:
       - "=========================================="
-      - "服务状态检查"
-      - "服务名称: {{ service_name }}"
-      - "检查结果: {{ 'Active/Activating' if service_check.rc == 0 else 'Failed' }}"
+      - "Service Status Check"
+      - "Service Name: {{ service_name }}"
+      - "Check Result: {{ 'Active/Activating' if service_check.rc == 0 else 'Failed' }}"
       - "=========================================="
       - "{{ service_status_detail.stdout_lines | default([]) }}"
   when: service_check.rc != 0
 
-- name: 最终验证（确认升级可以继续）
+- name: Final verification (confirm upgrade can continue)
   assert:
     that:
       - service_check.rc == 0 or 'activating' in service_status_detail.stdout | default('')
     fail_msg: |
-      服务 {{ service_name }} 启动失败且未处于 activating 状态
+      Service {{ service_name }} failed to start and is not in activating state
       
-      请手动检查：
+      Please manually check:
       1. sudo systemctl status {{ service_name }}
       2. sudo journalctl -u {{ service_name }} -n 100
       3. sudo cat {{ config_file }}
       
-      可能原因：
-      • 配置文件错误
-      • 网络连接问题
-      • 资源不足
-      • 端口冲突
-    success_msg: "服务正在运行或启动中，继续升级流程"
+      Possible causes:
+      • Configuration file error
+      • Network connectivity issues
+      • Insufficient resources
+      • Port conflicts
+    success_msg: "Service is running or starting, continuing upgrade process"
 
-- name: 验证升级后版本
+- name: Verify post-upgrade version
   shell: |
     {{ binary_path }} --version | head -1
   register: new_version
   changed_when: false
 
-- name: 显示新版本
+- name: Display new version
   debug:
     msg:
       - "=========================================="
-      - "✓ 升级完成"
-      - "旧版本: {{ current_version.stdout }}"
-      - "新版本: {{ new_version.stdout }}"
+      - "✓ Upgrade completed"
+      - "Old version: {{ current_version.stdout }}"
+      - "New version: {{ new_version.stdout }}"
       - "=========================================="
 
-- name: 验证节点状态 (Server)
+- name: Verify node status (Server)
   shell: |
     export KUBECONFIG={{ kubeconfig_path }}
     {{ kubectl_path }} get nodes
@@ -198,7 +198,7 @@
   changed_when: false
   when: node_role == "server"
 
-- name: 显示节点状态
+- name: Display node status
   debug:
     var: node_status.stdout_lines
   when: node_role == "server"

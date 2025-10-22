@@ -24,11 +24,11 @@
           - "=========================================="
 
   roles:
-    - role: rke_k3s
+    - role: rancher_cluster
 
   tasks:
     - name: 加载集群类型特定变量
-      include_vars: "../roles/rke_k3s/vars/{{ cluster_type }}.yml"
+      include_vars: "../roles/rancher_cluster/vars/{{ cluster_type }}.yml"
 
     - name: 设置升级标志
       set_fact:
@@ -36,7 +36,7 @@
 
     - name: 执行升级
       include_role:
-        name: rke_k3s
+        name: rancher_cluster
         tasks_from: upgrade
 
   post_tasks:
@@ -64,7 +64,7 @@
 
   tasks:
     - name: 加载集群类型特定变量
-      include_vars: "../roles/rke_k3s/vars/{{ cluster_type }}.yml"
+      include_vars: "../roles/rancher_cluster/vars/{{ cluster_type }}.yml"
 
     - name: 设置升级标志
       set_fact:
@@ -72,7 +72,7 @@
 
     - name: 执行升级
       include_role:
-        name: rke_k3s
+        name: rancher_cluster
         tasks_from: upgrade
 
   post_tasks:
