@@ -3,7 +3,7 @@
 # 用途：备份所有 Server 节点的 etcd 数据
 
 - name: 备份 etcd 快照
-  hosts: rke_k3s_servers
+  hosts: rke_servers
   become: yes
   gather_facts: yes
 

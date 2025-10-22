@@ -148,7 +148,7 @@ $ make setup
     • ansible_ssh_private_key_file - SSH 私钥路径
 
   示例：
-    [rke_k3s_servers]
+    [rke_servers]
     node1 ansible_host=192.168.1.10 cluster_init=true
     ...
 

@@ -25,6 +25,9 @@ registries_config: "/etc/rancher/rke2/registries.yaml"
 # 二进制文件路径
 binary_path: "/usr/local/bin/rke2"
 
+# kubectl 路径 (RKE2 不支持 rke2 kubectl 子命令)
+kubectl_path: "/var/lib/rancher/rke2/bin/kubectl"
+
 # Server Join Port
 server_port: "9345"
 

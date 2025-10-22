@@ -34,8 +34,10 @@ enable_registry_mirrors: "{{ china_region }}"
 # ============================================================================
 
 # HA 模式负载均衡器地址
-# RKE2: server_url: "https://lb.example.com:9345"
-# K3S: server_url: "https://lb.example.com:6443"
+# 留空或使用占位符，系统将自动从初始 Server 节点获取
+# RKE2: 自动使用 https://初始节点IP:9345
+# K3S:  自动使用 https://初始节点IP:6443
+# 如使用负载均衡器，手动配置: "https://lb.example.com:9345" (RKE2) 或 "https://lb.example.com:6443" (K3S)
 server_url: ""
 
 # 集群共享 Token (首个 server 可留空自动生成)
@@ -120,6 +122,33 @@ load_kernel_modules: true
 
 # 配置 sysctl 参数
 configure_sysctl: true
+
+# ============================================================================
+# DNS 配置
+# ============================================================================
+
+# 禁用 systemd-resolved (避免 DNS 被修改为集群内部 DNS)
+# 推荐: 如果不希望主机 DNS 被修改，设置为 true
+disable_systemd_resolved: false
+
+# 配置 systemd-resolved (保持运行但不管理 /etc/resolv.conf)
+configure_systemd_resolved: false
+
+# 保留原有 DNS 配置 (备份 /etc/resolv.conf)
+preserve_dns_config: true
+
+# 静态 DNS 服务器 (如果需要固定 DNS)
+static_dns_servers: []
+  # - "8.8.8.8"          # Google DNS
+  # - "114.114.114.114"  # 中国大陆 DNS
+  # - "223.5.5.5"        # 阿里云 DNS
+
+# DNS 搜索域
+dns_search_domains: []
+
+# 设置 resolv.conf 为不可变 (防止被其他服务修改)
+# 注意: 启用后需要手动 chattr -i /etc/resolv.conf 才能修改
+immutable_resolv_conf: false
 
 # ============================================================================
 # 防火墙配置

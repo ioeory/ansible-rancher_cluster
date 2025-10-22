@@ -144,6 +144,10 @@
         - "/usr/lib/systemd/system/rke2-agent.service"
         - "/usr/lib/systemd/system/k3s.service"
         - "/usr/lib/systemd/system/k3s-agent.service"
+        - "/usr/local/lib/systemd/system/rke2-server.service"
+        - "/usr/local/lib/systemd/system/rke2-agent.service"
+        - "/usr/local/lib/systemd/system/k3s.service"
+        - "/usr/local/lib/systemd/system/k3s-agent.service"
       ignore_errors: yes
 
     - name: 重新加载 systemd

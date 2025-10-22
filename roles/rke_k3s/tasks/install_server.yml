@@ -1,24 +1,104 @@
 ---
 # Server 节点安装任务
 
+- name: 获取初始 Server 节点信息
+  set_fact:
+    init_server_host: "{{ groups['rke_servers'] | map('extract', hostvars) | selectattr('cluster_init', 'defined') | selectattr('cluster_init') | map(attribute='inventory_hostname') | first }}"
+  when: not cluster_init | bool
+
+- name: 获取初始 Server 节点 IP
+  set_fact:
+    init_server_ip: "{{ hostvars[init_server_host]['ansible_host'] }}"
+  when: not cluster_init | bool
+
+- name: 自动生成 server_url (非初始节点)
+  set_fact:
+    server_url: "https://{{ init_server_ip }}:{{ '9345' if cluster_type == 'rke2' else '6443' }}"
+  when:
+    - not cluster_init | bool
+    - server_url is not defined or server_url | length == 0 or 'FIRST_NODE_IP' in server_url
+
 - name: 显示 Server 安装信息
   debug:
     msg:
       - "=========================================="
       - "开始安装 {{ cluster_type | upper }} Server 节点"
       - "集群初始化: {{ cluster_init }}"
+      - "初始节点: {{ init_server_host | default('N/A') }}"
+      - "初始节点 IP: {{ init_server_ip | default('N/A') }}"
       - "Server URL: {{ server_url | default('N/A', true) }}"
       - "=========================================="
 
-- name: 验证配置 (非初始节点)
+- name: 验证 server_url (非初始节点)
   assert:
     that:
       - server_url is defined
       - server_url | length > 0
+      - "'FIRST_NODE_IP' not in server_url"
+    fail_msg: "无法自动获取 server_url，请检查初始节点配置或手动配置 server_url"
+  when: not cluster_init | bool
+
+- name: 从初始 Server 节点获取 Token (非初始节点)
+  slurp:
+    src: "{{ token_file }}"
+  delegate_to: "{{ groups['rke_servers'] | map('extract', hostvars) | selectattr('cluster_init', 'defined') | selectattr('cluster_init') | map(attribute='inventory_hostname') | first }}"
+  register: server_token_content
+  when:
+    - not cluster_init | bool
+    - cluster_token is not defined or cluster_token | length == 0
+  ignore_errors: yes
+
+- name: 设置从 Server 获取的 Token (非初始节点)
+  set_fact:
+    cluster_token: "{{ server_token_content.content | b64decode | trim }}"
+  when:
+    - not cluster_init | bool
+    - cluster_token is not defined or cluster_token | length == 0
+    - server_token_content is defined
+    - not server_token_content.failed
+
+- name: 检查本地是否存在 Token 文件 (备用方案)
+  stat:
+    path: "/tmp/{{ cluster_type }}-token.txt"
+  delegate_to: localhost
+  become: false
+  register: local_token_file
+  when:
+    - not cluster_init | bool
+    - cluster_token is not defined or cluster_token | length == 0
+
+- name: 从本地文件读取 Token (备用方案)
+  set_fact:
+    cluster_token: "{{ lookup('file', '/tmp/' + cluster_type + '-token.txt') | trim }}"
+  when:
+    - not cluster_init | bool
+    - cluster_token is not defined or cluster_token | length == 0
+    - local_token_file.stat.exists
+
+- name: 验证 Token 已获取 (非初始节点)
+  assert:
+    that:
       - cluster_token is defined
       - cluster_token | length > 0
-    fail_msg: "非初始节点必须配置 server_url 和 cluster_token"
+    fail_msg: "无法获取 cluster_token，请确保初始 Server 节点已安装或手动配置 cluster_token"
   when: not cluster_init | bool
+
+- name: 显示 Token 获取状态 (非初始节点)
+  debug:
+    msg: "✓ 成功获取 cluster_token ({{ 'from init server node' if (server_token_content is defined and not server_token_content.failed) else 'from local file' }})"
+  when: not cluster_init | bool
+
+- name: 更新本地 Token 文件 (非初始节点)
+  copy:
+    content: "{{ cluster_token }}"
+    dest: "/tmp/{{ cluster_type }}-token.txt"
+    mode: '0600'
+  delegate_to: localhost
+  become: false
+  when:
+    - not cluster_init | bool
+    - cluster_token is defined
+    - cluster_token | length > 0
 
 - name: 创建配置目录
   file:
@@ -71,7 +151,7 @@
   args:
     creates: "{{ binary_path }}"
   async: "{{ install_timeout }}"
-  poll: 10
+  poll: 15
   when: cluster_type == 'rke2'
 
 - name: 执行安装脚本 (K3S Server)
@@ -83,7 +163,7 @@
   args:
     creates: "{{ binary_path }}"
   async: "{{ install_timeout }}"
-  poll: 10
+  poll: 15
   when: cluster_type == 'k3s'
 
 - name: 启动服务
@@ -153,10 +233,10 @@
 - name: 验证节点状态
   shell: |
     export KUBECONFIG={{ kubeconfig_path }}
-    {{ binary_path }} kubectl get nodes
+    {{ kubectl_path }} get nodes
   register: node_status
-  retries: 10
-  delay: 10
+  retries: 30
+  delay: 20
   until: node_status.rc == 0
   changed_when: false
 

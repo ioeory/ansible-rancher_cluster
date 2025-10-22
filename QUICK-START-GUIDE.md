@@ -47,7 +47,7 @@ make setup
 编辑 `inventory/hosts.ini`：
 
 ```ini
-[rke_k3s_servers]
+[rke_servers]
 node1 ansible_host=192.168.2.41 cluster_init=true
 node2 ansible_host=192.168.2.42
 node3 ansible_host=192.168.2.43
@@ -137,7 +137,7 @@ china_region=true
 install_version=
 server_url=https://192.168.2.41:9345
 
-[rke_k3s_servers]
+[rke_servers]
 node1 ansible_host=192.168.2.41 cluster_init=true
 node2 ansible_host=192.168.2.42
 node3 ansible_host=192.168.2.43
@@ -159,7 +159,7 @@ china_region=false
 install_version=v1.33.5+k3s1
 server_url=https://192.168.2.41:6443
 
-[rke_k3s_servers]
+[rke_servers]
 node1 ansible_host=192.168.2.41 cluster_init=true
 node2 ansible_host=192.168.2.42
 node3 ansible_host=192.168.2.43
@@ -180,7 +180,7 @@ cluster_type=k3s
 china_region=true
 server_url=https://192.168.2.41:6443
 
-[rke_k3s_servers]
+[rke_servers]
 node1 ansible_host=192.168.2.41 cluster_init=true
 
 # 只配置一个节点，快速测试

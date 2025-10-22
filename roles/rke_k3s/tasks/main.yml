@@ -29,6 +29,14 @@
     - preflight
     - install
 
+- name: 配置 DNS (防止被修改)
+  include_tasks: dns_fix.yml
+  when: 
+    - disable_systemd_resolved | default(false) or configure_systemd_resolved | default(false)
+  tags:
+    - dns
+    - install
+
 - name: 配置中国大陆特殊环境
   include_tasks: configure_china.yml
   when: china_region | bool

@@ -144,7 +144,7 @@ make setup
 编辑 `inventory/hosts.ini`:
 
 ```ini
-[rke_k3s_servers]
+[rke_servers]
 master1 ansible_host=192.168.1.11 cluster_init=true
 
 [all:vars]
@@ -179,21 +179,21 @@ kubectl get pods -A
 
 ```ini
 # Server 节点组
-[rke_k3s_servers]
+[rke_servers]
 node1 ansible_host=IP cluster_init=true
 node2 ansible_host=IP
 node3 ansible_host=IP
 
 # Agent 节点组
-[rke_k3s_agents]
+[rke_agents]
 worker1 ansible_host=IP
 worker2 ansible_host=IP
 
 # 组变量
-[rke_k3s_servers:vars]
+[rke_servers:vars]
 node_role=server
 
-[rke_k3s_agents:vars]
+[rke_agents:vars]
 node_role=agent
 
 # 全局变量
@@ -268,7 +268,7 @@ enable_registry_mirrors: true
 #### Inventory 配置
 
 ```ini
-[rke_k3s_servers]
+[rke_servers]
 test-node ansible_host=192.168.1.10 cluster_init=true
 
 [all:vars]
@@ -344,7 +344,7 @@ backend rke2-join-backend
 #### Inventory 配置
 
 ```ini
-[rke_k3s_servers]
+[rke_servers]
 master1 ansible_host=192.168.1.11 cluster_init=true
 master2 ansible_host=192.168.1.12
 master3 ansible_host=192.168.1.13
@@ -373,21 +373,21 @@ make install
 #### Inventory 配置
 
 ```ini
-[rke_k3s_servers]
+[rke_servers]
 master1 ansible_host=192.168.1.11 cluster_init=true
 master2 ansible_host=192.168.1.12
 master3 ansible_host=192.168.1.13
 
-[rke_k3s_agents]
+[rke_agents]
 worker1 ansible_host=192.168.1.21
 worker2 ansible_host=192.168.1.22
 worker3 ansible_host=192.168.1.23
 
-[rke_k3s_servers:vars]
+[rke_servers:vars]
 node_role=server
 node_taints=['node-role.kubernetes.io/control-plane:NoSchedule']
 
-[rke_k3s_agents:vars]
+[rke_agents:vars]
 node_role=agent
 
 [all:vars]

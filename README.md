@@ -291,12 +291,12 @@ ansible-vault encrypt_string 'my-token' --name 'cluster_token'
 
 ```ini
 # inventory/hosts.ini
-[rke_k3s_servers]
+[rke_servers]
 master1 ansible_host=192.168.1.11 cluster_init=true
 master2 ansible_host=192.168.1.12
 master3 ansible_host=192.168.1.13
 
-[rke_k3s_agents]
+[rke_agents]
 worker1 ansible_host=192.168.1.21
 worker2 ansible_host=192.168.1.22
 

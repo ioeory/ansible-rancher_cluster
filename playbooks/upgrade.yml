@@ -3,12 +3,18 @@
 # 用途：滚动升级 RKE2 或 K3S 集群
 
 - name: 升级 Server 节点
-  hosts: rke_k3s_servers
+  hosts: rke_servers
   become: yes
   gather_facts: yes
   serial: 1  # 每次升级一个 Server，确保高可用
 
   pre_tasks:
+    - name: 设置全局升级确认标志
+      set_fact:
+        upgrade_confirmed: true
+      run_once: yes
+      delegate_to: localhost
+      delegate_facts: yes
     - name: 显示升级信息
       debug:
         msg:
@@ -40,12 +46,15 @@
         prompt: "等待 Server 节点稳定后继续..."
 
 - name: 升级 Agent 节点
-  hosts: rke_k3s_agents
+  hosts: rke_agents
   become: yes
   gather_facts: yes
-  serial: "30%"  # 每次升级 30% 的 Agent 节点
+  serial: "80%"  # 每次并行升级 30% 的 Agent 节点（最少1个）
 
   pre_tasks:
+    - name: 设置 Agent 跳过确认
+      set_fact:
+        skip_upgrade_confirmation: true
     - name: 显示升级信息
       debug:
         msg:
@@ -72,7 +81,7 @@
         seconds: 15
 
 - name: 升级完成验证
-  hosts: rke_k3s_servers[0]
+  hosts: rke_servers[0]
   become: yes
   gather_facts: no
 

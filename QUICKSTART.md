@@ -12,7 +12,7 @@ make setup
 
 # 2. 编辑主机清单
 cat > inventory/hosts.ini <<EOF
-[rke_k3s_servers]
+[rke_servers]
 test-node ansible_host=192.168.1.10 cluster_init=true
 
 [all:vars]
@@ -33,12 +33,12 @@ kubectl get nodes
 ```bash
 # 1. 配置主机清单
 cat > inventory/hosts.ini <<EOF
-[rke_k3s_servers]
+[rke_servers]
 master1 ansible_host=192.168.1.11 cluster_init=true
 master2 ansible_host=192.168.1.12
 master3 ansible_host=192.168.1.13
 
-[rke_k3s_agents]
+[rke_agents]
 worker1 ansible_host=192.168.1.21
 worker2 ansible_host=192.168.1.22
 

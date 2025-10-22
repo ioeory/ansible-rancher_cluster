@@ -159,11 +159,11 @@ etcd_snapshot_retention: 10  # 保留 10 个备份
 ```ini
 # inventory/hosts.ini
 
-[rke_k3s_agents]
+[rke_agents]
 worker1 ansible_host=192.168.2.51
 worker2 ansible_host=192.168.2.52
 
-[rke_k3s_agents:vars]
+[rke_agents:vars]
 node_role=agent
 ```
 

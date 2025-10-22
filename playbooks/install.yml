@@ -2,23 +2,101 @@
 # RKE2/K3S 安装 Playbook
 # 用途：安装和配置 RKE2 或 K3S 集群
 
-- name: 安装 RKE2/K3S 集群
+# ============================================================================
+# 阶段 1: 部署初始 Server 节点（cluster_init=true）
+# ============================================================================
+- name: 阶段 1 - 部署初始 Server 节点
+  hosts: all
+  become: yes
+  gather_facts: yes
+  
+  pre_tasks:
+    - name: 显示初始节点信息
+      debug:
+        msg:
+          - "=========================================="
+          - "阶段 1: 部署初始 Server 节点"
+          - "目标主机: {{ inventory_hostname }}"
+          - "集群类型: {{ cluster_type | upper }}"
+          - "=========================================="
+      when: 
+        - node_role == 'server'
+        - cluster_init | bool
+
+  roles:
+    - role: rke_k3s
+      when:
+        - node_role == 'server'
+        - cluster_init | bool
+
+  post_tasks:
+    - name: 等待初始节点就绪
+      pause:
+        seconds: 30
+        prompt: "等待初始 Server 节点完全就绪并生成 Token..."
+      when:
+        - node_role == 'server'
+        - cluster_init | bool
+      run_once: yes
+
+# ============================================================================
+# 阶段 2: 部署其他 Server 节点
+# ============================================================================
+- name: 阶段 2 - 部署其他 Server 节点
   hosts: all
   become: yes
   gather_facts: yes
 
   pre_tasks:
-    - name: 显示安装信息
+    - name: 显示其他 Server 节点信息
       debug:
         msg:
           - "=========================================="
-          - "开始安装 {{ cluster_type | upper }} 集群"
+          - "阶段 2: 部署其他 Server 节点"
           - "目标主机: {{ inventory_hostname }}"
           - "=========================================="
-      run_once: no
+      when:
+        - node_role == 'server'
+        - not (cluster_init | default(false) | bool)
 
   roles:
     - role: rke_k3s
+      when:
+        - node_role == 'server'
+        - not (cluster_init | default(false) | bool)
+
+  post_tasks:
+    - name: 等待其他 Server 节点就绪
+      pause:
+        seconds: 30
+        prompt: "等待其他 Server 节点完全加入集群..."
+      when:
+        - node_role == 'server'
+        - not (cluster_init | default(false) | bool)
+      run_once: yes
+
+# ============================================================================
+# 阶段 3: 部署 Agent 节点（并行安装 30%）
+# ============================================================================
+- name: 阶段 3 - 部署 Agent 节点
+  hosts: all
+  become: yes
+  gather_facts: yes
+  serial: "30%"  # 每次并行安装 30% 的 Agent 节点（最少1个）
+
+  pre_tasks:
+    - name: 显示 Agent 节点信息
+      debug:
+        msg:
+          - "=========================================="
+          - "阶段 3: 部署 Agent 节点"
+          - "目标主机: {{ inventory_hostname }}"
+          - "=========================================="
+      when: node_role == 'agent'
+
+  roles:
+    - role: rke_k3s
+      when: node_role == 'agent'
 
   post_tasks:
     - name: 安装完成提示
@@ -27,11 +105,15 @@
           - "=========================================="
           - "✓ 所有节点安装完成"
           - ""
+          - "集群节点："
+          - "  - 初始 Server: {{ groups['rke_servers'] | map('extract', hostvars) | selectattr('cluster_init', 'defined') | selectattr('cluster_init') | map(attribute='inventory_hostname') | first }}"
+          - "  - 其他 Server: {{ groups['rke_servers'] | map('extract', hostvars) | rejectattr('cluster_init', 'defined') | map(attribute='inventory_hostname') | list | join(', ') if groups['rke_servers'] | length > 1 else '无' }}"
+          - "  - Agent 节点: {{ groups['rke_agents'] | join(', ') if groups['rke_agents'] is defined else '无' }}"
+          - ""
           - "后续步骤："
           - "1. 在 Server 节点执行: export KUBECONFIG=/etc/rancher/{{ cluster_type }}/{{ cluster_type }}.yaml"
           - "2. 验证节点状态: kubectl get nodes"
           - "3. 查看 Pod 状态: kubectl get pods -A"
           - "=========================================="
       run_once: yes
-      delegate_to: "{{ groups['rke_k3s_servers'][0] }}"
-      when: groups['rke_k3s_servers'] is defined
+      when: node_role == 'agent'

@@ -1,8 +1,8 @@
 ---
 # K3S 特定变量配置
 
-# 服务名称
-service_name: "k3s"
+# 服务名称 (Server: k3s, Agent: k3s-agent)
+service_name: "{{ 'k3s' if node_role == 'server' else 'k3s-agent' }}"
 
 # 配置目录
 config_dir: "/etc/rancher/k3s"
@@ -24,6 +24,9 @@ registries_config: "/etc/rancher/k3s/registries.yaml"
 
 # 二进制文件路径
 binary_path: "/usr/local/bin/k3s"
+
+# kubectl 路径 (K3S 支持 k3s kubectl 子命令)
+kubectl_path: "{{ binary_path }} kubectl"
 
 # Server Join Port (K3S 使用 API 端口)
 server_port: "6443"

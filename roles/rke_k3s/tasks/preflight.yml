@@ -198,22 +198,36 @@
     (ansible_os_family == 'RedHat' and firewalld_status.status.ActiveState == 'active') or
     (ansible_os_family == 'Debian' and 'Status: active' in ufw_status.stdout)
 
+- name: 设置测试 URL (根据集群类型)
+  set_fact:
+    rancher_mirror_test_url: "{{ 'https://rancher-mirror.rancher.cn/k3s/k3s-install.sh' if cluster_type == 'k3s' else 'https://rancher-mirror.rancher.cn/rke2/install.sh' }}"
+    rancher_mirror_label: "{{ 'Rancher K3S 镜像' if cluster_type == 'k3s' else 'Rancher RKE2 镜像' }}"
+  when: china_region | bool
+
 - name: 测试中国镜像源连通性
   uri:
-    url: "{{ item }}"
+    url: "{{ item.url }}"
     method: HEAD
     timeout: 5
-  loop: "{{ china_network_test_urls }}"
+    # 接受 2xx (成功), 3xx (重定向), 4xx (客户端错误，但服务器可达)
+    status_code: [200, 201, 202, 203, 204, 205, 206, 207, 208, 226, 301, 302, 303, 304, 305, 306, 307, 308, 400, 401, 402, 403, 404, 405, 406, 407, 408, 409, 410, 411, 412, 413, 414, 415, 416, 417, 418, 421, 422, 423, 424, 425, 426, 428, 429, 431, 451]
+  loop:
+    - { url: "{{ rancher_mirror_test_url }}", label: "{{ rancher_mirror_label }}" }
+    - { url: "https://mirrors.aliyun.com", label: "阿里云镜像" }
   register: china_network_test
   ignore_errors: yes
   when: china_region | bool
 
 - name: 显示网络测试结果
   debug:
-    msg: "中国镜像源连通性测试成功"
+    msg:
+      - "✓ 中国镜像源连通性测试通过"
+      - "  - {{ rancher_mirror_label }}: {{ 'OK (HTTP ' + (china_network_test.results[0].status | string) + ')' if (china_network_test.results[0].status >= 200 and china_network_test.results[0].status < 500) else 'FAILED' }}"
+      - "  - 阿里云镜像: {{ 'OK (HTTP ' + (china_network_test.results[1].status | string) + ')' if (china_network_test.results[1].status >= 200 and china_network_test.results[1].status < 500) else 'FAILED' }}"
   when:
     - china_region | bool
-    - china_network_test.results | selectattr('status', 'defined') | selectattr('status', 'equalto', 200) | list | length > 0
+    - china_network_test is defined
+    - china_network_test.results is defined
 
 - name: 检查是否已安装
   stat:

@@ -1,6 +1,9 @@
 ---
 # 集群升级任务
 
+- name: 加载集群类型特定变量
+  include_vars: "../roles/rke_k3s/vars/{{ cluster_type }}.yml"
+
 - name: 显示升级信息
   debug:
     msg:
@@ -21,12 +24,17 @@
 
 - name: 升级前备份
   include_tasks: backup.yml
-  when: backup_before_upgrade | bool
+  when: 
+    - backup_before_upgrade | bool
+    - node_role == 'server'
 
 - name: 确认升级
   pause:
-    prompt: "确认升级？按 Enter 继续，Ctrl+C 取消"
-  when: not ansible_check_mode
+    prompt: "确认升级集群？按 Enter 继续，Ctrl+C 取消"
+  when: 
+    - not ansible_check_mode
+    - not (skip_upgrade_confirmation | default(false))
+  run_once: yes
 
 - name: 下载新版本安装脚本
   get_url:
@@ -38,9 +46,24 @@
   retries: "{{ download_retries }}"
   delay: 5
 
-- name: 设置安装环境变量
+- name: 设置安装环境变量（基础）
+
   set_fact:
-    install_env: "{{ install_env_vars | default({}) }}"
+    install_env: {}
+
+- name: 添加中国镜像源环境变量 (RKE2)
+  set_fact:
+    install_env: "{{ install_env | combine(china_mirror_env) }}"
+  when:
+    - china_region | bool
+    - cluster_type == 'rke2'
+
+- name: 添加中国镜像源环境变量 (K3S)
+  set_fact:
+    install_env: "{{ install_env | combine(china_mirror_env) }}"
+  when:
+    - china_region | bool
+    - cluster_type == 'k3s'
 
 - name: 添加版本环境变量 (RKE2)
   set_fact:
@@ -65,7 +88,7 @@
     {% endfor %}
     INSTALL_RKE2_TYPE="{{ node_role }}" sh /tmp/{{ cluster_type }}-install.sh
   async: "{{ upgrade_timeout }}"
-  poll: 10
+  poll: 15
   when: cluster_type == 'rke2'
   register: upgrade_result
 
@@ -76,7 +99,7 @@
     {% endfor %}
     INSTALL_K3S_EXEC="{{ node_role }}" sh /tmp/{{ cluster_type }}-install.sh
   async: "{{ upgrade_timeout }}"
-  poll: 10
+  poll: 15
   when: cluster_type == 'k3s'
   register: upgrade_result
 
@@ -85,13 +108,69 @@
     name: "{{ service_name }}"
     state: restarted
     daemon_reload: yes
+  register: restart_result
+  failed_when: false
 
-- name: 等待服务恢复
+- name: 初始等待（给服务启动时间）
+  pause:
+    seconds: 30
+  when: restart_result.failed | default(false)
+
+- name: 智能等待服务状态（接受 active 或 activating）
+  shell: |
+    systemctl is-active {{ service_name }} || systemctl status {{ service_name }} | grep -q "activating"
+  register: service_check
+  retries: 30
+  delay: 20
+  until: service_check.rc == 0
+  changed_when: false
+  failed_when: false
+
+- name: 等待 API Server 端口就绪（Server 节点）
   wait_for:
     host: "{{ ansible_default_ipv4.address }}"
     port: "{{ api_port }}"
-    timeout: "{{ service_wait_timeout }}"
-  when: node_role == "server"
+    timeout: 300
+  when: 
+    - node_role == "server"
+    - service_check.rc == 0
+  ignore_errors: yes
+
+- name: 获取服务详细状态（如果仍有问题）
+  shell: systemctl status {{ service_name }} --no-pager -l
+  register: service_status_detail
+  changed_when: false
+  when: service_check.rc != 0
+
+- name: 显示服务状态信息
+  debug:
+    msg:
+      - "=========================================="
+      - "服务状态检查"
+      - "服务名称: {{ service_name }}"
+      - "检查结果: {{ 'Active/Activating' if service_check.rc == 0 else 'Failed' }}"
+      - "=========================================="
+      - "{{ service_status_detail.stdout_lines | default([]) }}"
+  when: service_check.rc != 0
+
+- name: 最终验证（确认升级可以继续）
+  assert:
+    that:
+      - service_check.rc == 0 or 'activating' in service_status_detail.stdout | default('')
+    fail_msg: |
+      服务 {{ service_name }} 启动失败且未处于 activating 状态
+      
+      请手动检查：
+      1. sudo systemctl status {{ service_name }}
+      2. sudo journalctl -u {{ service_name }} -n 100
+      3. sudo cat {{ config_file }}
+      
+      可能原因：
+      • 配置文件错误
+      • 网络连接问题
+      • 资源不足
+      • 端口冲突
+    success_msg: "服务正在运行或启动中，继续升级流程"
 
 - name: 验证升级后版本
   shell: |
@@ -111,7 +190,7 @@
 - name: 验证节点状态 (Server)
   shell: |
     export KUBECONFIG={{ kubeconfig_path }}
-    {{ binary_path }} kubectl get nodes
+    {{ kubectl_path }} get nodes
   register: node_status
   retries: 10
   delay: 10

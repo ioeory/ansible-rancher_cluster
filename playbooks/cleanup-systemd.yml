@@ -1,0 +1,95 @@
+---
+# 清理残留的 systemd 服务文件
+# 用途：删除 /usr/local/lib/systemd/system/ 中残留的 RKE2/K3S 服务文件
+
+- name: 清理残留的 systemd 服务文件
+  hosts: all
+  become: yes
+  gather_facts: no
+
+  tasks:
+    - name: 显示清理信息
+      debug:
+        msg:
+          - "=========================================="
+          - "清理节点: {{ inventory_hostname }}"
+          - "=========================================="
+
+    - name: 停止并禁用 RKE2 服务
+      systemd:
+        name: "{{ item }}"
+        state: stopped
+        enabled: no
+      loop:
+        - rke2-server
+        - rke2-agent
+      ignore_errors: yes
+
+    - name: 停止并禁用 K3S 服务
+      systemd:
+        name: "{{ item }}"
+        state: stopped
+        enabled: no
+      loop:
+        - k3s
+        - k3s-agent
+      ignore_errors: yes
+
+    - name: 删除 systemd 服务文件
+      file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        # /etc/systemd/system/
+        - "/etc/systemd/system/rke2-server.service"
+        - "/etc/systemd/system/rke2-agent.service"
+        - "/etc/systemd/system/k3s.service"
+        - "/etc/systemd/system/k3s-agent.service"
+        # /usr/lib/systemd/system/
+        - "/usr/lib/systemd/system/rke2-server.service"
+        - "/usr/lib/systemd/system/rke2-agent.service"
+        - "/usr/lib/systemd/system/k3s.service"
+        - "/usr/lib/systemd/system/k3s-agent.service"
+        # /usr/local/lib/systemd/system/ (RKE2 的默认位置)
+        - "/usr/local/lib/systemd/system/rke2-server.service"
+        - "/usr/local/lib/systemd/system/rke2-agent.service"
+        - "/usr/local/lib/systemd/system/k3s.service"
+        - "/usr/local/lib/systemd/system/k3s-agent.service"
+      register: cleanup_result
+
+    - name: 统计删除的文件数量
+      set_fact:
+        deleted_count: "{{ cleanup_result.results | selectattr('changed', 'equalto', true) | list | length }}"
+
+    - name: 重新加载 systemd
+      systemd:
+        daemon_reload: yes
+      when: deleted_count | int > 0
+
+    - name: 显示清理结果
+      debug:
+        msg:
+          - "✓ 已删除 {{ deleted_count }} 个服务文件"
+          - "✓ systemd 已重新加载"
+      when: deleted_count | int > 0
+
+    - name: 显示无残留信息
+      debug:
+        msg: "✓ 未发现残留的服务文件"
+      when: deleted_count | int == 0
+
+  post_tasks:
+    - name: 完成提示
+      debug:
+        msg:
+          - "=========================================="
+          - "✓ systemd 清理完成"
+          - ""
+          - "现在可以重新运行验证:"
+          - "  make verify-uninstall"
+          - ""
+          - "或重新部署集群:"
+          - "  make install"
+          - "=========================================="
+      run_once: yes
+

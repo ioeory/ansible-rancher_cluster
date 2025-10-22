@@ -1,0 +1,21 @@
+# {{ ansible_managed }}
+# 静态 DNS 配置 - 由 Ansible 管理
+# 防止被 systemd-resolved 或 NetworkManager 覆盖
+
+{% if static_dns_servers | default([]) | length > 0 %}
+{% for dns in static_dns_servers %}
+nameserver {{ dns }}
+{% endfor %}
+{% else %}
+# 默认 DNS 服务器
+nameserver 8.8.8.8
+nameserver 114.114.114.114
+{% endif %}
+
+{% if dns_search_domains | default([]) | length > 0 %}
+search {{ dns_search_domains | join(' ') }}
+{% endif %}
+
+# 配置选项
+options timeout:2 attempts:3 rotate single-request-reopen
+

@@ -140,8 +140,32 @@ etcd_snapshot_schedule: "0 */12 * * *"
 # 升级前自动备份
 backup_before_upgrade: true
 
-# 节点升级超时时间 (秒)
-upgrade_timeout: 600
+# 节点升级超时时间 (秒) - 增加到 20 分钟，适应慢速网络和大文件下载
+upgrade_timeout: 1200
+
+# ============================================================================
+# DNS 配置
+# ============================================================================
+
+# 禁用 systemd-resolved (避免 DNS 被修改)
+disable_systemd_resolved: false
+
+# 配置 systemd-resolved (不禁用但防止干预)
+configure_systemd_resolved: false
+
+# 保留原有 DNS 配置 (备份 resolv.conf)
+preserve_dns_config: true
+
+# 静态 DNS 服务器列表
+static_dns_servers: []
+  # - "8.8.8.8"
+  # - "114.114.114.114"
+
+# DNS 搜索域
+dns_search_domains: []
+
+# 设置 resolv.conf 为不可变 (防止被修改)
+immutable_resolv_conf: false
 
 # ============================================================================
 # 防火墙配置
@@ -174,7 +198,7 @@ configure_sysctl: true
 install_timeout: 1800
 
 # 服务启动等待时间 (秒)
-service_wait_timeout: 300
+service_wait_timeout: 600
 
 # 下载重试次数
 download_retries: 3

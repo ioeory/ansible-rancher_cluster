@@ -1,6 +1,12 @@
 ---
 # etcd 备份任务
 
+- name: 检查节点角色
+  assert:
+    that:
+      - node_role == 'server'
+    fail_msg: "etcd 备份只能在 Server 节点上执行，当前节点角色: {{ node_role }}"
+
 - name: 显示备份信息
   debug:
     msg:
@@ -35,7 +41,7 @@
 - name: 获取最新备份文件
   find:
     paths: "{{ backup_dir }}"
-    patterns: "snapshot-*.db"
+    patterns: "snapshot-*"
     file_type: file
   register: backup_files
 
@@ -49,14 +55,15 @@
 - name: 清理旧备份
   shell: |
     cd {{ backup_dir }}
-    ls -t snapshot-*.db | tail -n +{{ etcd_snapshot_retention + 1 }} | xargs -r rm -f
+    ls -t snapshot-* 2>/dev/null | tail -n +{{ etcd_snapshot_retention + 1 }} | xargs -r rm -f
   when: etcd_snapshot_retention is defined
   changed_when: true
+  ignore_errors: yes
 
 - name: 备份统计
   find:
     paths: "{{ backup_dir }}"
-    patterns: "snapshot-*.db"
+    patterns: "snapshot-*"
     file_type: file
   register: backup_count
 

@@ -1,7 +1,7 @@
 # RKE2/K3S Ansible Role Makefile
 # 快速管理和操作工具
 
-.PHONY: help install install-china upgrade backup uninstall check ping test clean
+.PHONY: help install install-china upgrade backup check-backup uninstall verify-uninstall cleanup-systemd check ping test clean
 
 # 默认变量
 INVENTORY ?= inventory/hosts.ini
@@ -31,6 +31,7 @@ help: ## 显示此帮助信息
 	@echo "  make install                    # 安装集群"
 	@echo "  make install-china              # 中国大陆安装"
 	@echo "  make upgrade                    # 升级集群"
+	@echo "  make upgrade-continue           # 继续中断的升级"
 	@echo "  make backup                     # 备份 etcd"
 	@echo "  make check                      # 检查连接"
 	@echo ""
@@ -71,20 +72,54 @@ install-rke2: ## 安装 RKE2 集群
 # ============================================================================
 
 upgrade: ## 升级集群到新版本
-	@echo "$(BLUE)开始升级集群...$(NC)"
-	@echo "$(YELLOW)警告: 升级操作将滚动重启所有节点$(NC)"
-	@read -p "确认继续? [y/N]: " confirm; \
+	@echo "$(BLUE)========================================$(NC)"
+	@echo "$(BLUE)  集群升级$(NC)"
+	@echo "$(BLUE)========================================$(NC)"
+	@echo ""
+	@echo "$(YELLOW)⚠️  警告: 升级操作将滚动重启所有节点$(NC)"
+	@echo ""
+	@echo "升级前检查:"
+	@echo "  • 确保已备份重要数据"
+	@echo "  • 升级过程可能需要 10-30 分钟"
+	@echo "  • 如果升级中断，可使用 'make upgrade-continue' 恢复"
+	@echo ""
+	@read -p "确认继续升级? [y/N]: " confirm; \
 	if [ "$$confirm" = "y" ] || [ "$$confirm" = "Y" ]; then \
 		ANSIBLE_ROLES_PATH=$(ANSIBLE_ROLES_PATH) ansible-playbook -i $(INVENTORY) $(PLAYBOOK_DIR)/upgrade.yml $(EXTRA_ARGS); \
-		echo "$(GREEN)✓ 升级完成$(NC)"; \
+		echo ""; \
+		echo "$(GREEN)========================================$(NC)"; \
+		echo "$(GREEN)  ✓ 升级完成$(NC)"; \
+		echo "$(GREEN)========================================$(NC)"; \
 	else \
-		echo "$(YELLOW)已取消$(NC)"; \
+		echo "$(YELLOW)已取消升级$(NC)"; \
 	fi
 
-upgrade-force: ## 强制升级 (无需确认)
-	@echo "$(BLUE)开始升级集群...$(NC)"
-	ANSIBLE_ROLES_PATH=$(ANSIBLE_ROLES_PATH) ansible-playbook -i $(INVENTORY) $(PLAYBOOK_DIR)/upgrade.yml $(EXTRA_ARGS)
-	@echo "$(GREEN)✓ 升级完成$(NC)"
+upgrade-continue: ## 继续中断的升级 (无需确认，适合恢复升级)
+	@echo "$(BLUE)========================================$(NC)"
+	@echo "$(BLUE)  继续升级$(NC)"
+	@echo "$(BLUE)========================================$(NC)"
+	@echo ""
+	@echo "$(GREEN)✓ 继续执行升级流程...$(NC)"
+	@echo "$(CYAN)  提示: Ansible 会自动跳过已升级的节点$(NC)"
+	@echo ""
+	@ANSIBLE_ROLES_PATH=$(ANSIBLE_ROLES_PATH) ansible-playbook -i $(INVENTORY) $(PLAYBOOK_DIR)/upgrade.yml $(EXTRA_ARGS)
+	@echo ""
+	@echo "$(GREEN)========================================$(NC)"
+	@echo "$(GREEN)  ✓ 升级完成$(NC)"
+	@echo "$(GREEN)========================================$(NC)"
+
+upgrade-force: ## 强制升级所有节点 (无需确认，强制重新升级)
+	@echo "$(BLUE)========================================$(NC)"
+	@echo "$(BLUE)  强制升级$(NC)"
+	@echo "$(BLUE)========================================$(NC)"
+	@echo ""
+	@echo "$(RED)⚠️  警告: 强制升级将重新升级所有节点$(NC)"
+	@echo ""
+	@ANSIBLE_ROLES_PATH=$(ANSIBLE_ROLES_PATH) ansible-playbook -i $(INVENTORY) $(PLAYBOOK_DIR)/upgrade.yml $(EXTRA_ARGS)
+	@echo ""
+	@echo "$(GREEN)========================================$(NC)"
+	@echo "$(GREEN)  ✓ 升级完成$(NC)"
+	@echo "$(GREEN)========================================$(NC)"
 
 # ============================================================================
 # 备份操作
@@ -94,6 +129,13 @@ backup: ## 备份 etcd 数据
 	@echo "$(BLUE)开始备份 etcd...$(NC)"
 	ANSIBLE_ROLES_PATH=$(ANSIBLE_ROLES_PATH) ansible-playbook -i $(INVENTORY) $(PLAYBOOK_DIR)/backup.yml $(EXTRA_ARGS)
 	@echo "$(GREEN)✓ 备份完成$(NC)"
+
+check-backup: ## 检查备份状态
+	@echo "$(BLUE)检查备份状态...$(NC)"
+	@CLUSTER_TYPE=$$(grep "^cluster_type=" $(INVENTORY) | head -1 | cut -d'=' -f2 || echo "k3s"); \
+	echo "$(YELLOW)集群类型: $$CLUSTER_TYPE$(NC)"; \
+	echo "$(YELLOW)在 Server 节点上执行检查脚本...$(NC)"; \
+	ansible rke_servers -i $(INVENTORY) -m script -a "scripts/check-backup-status.sh $$CLUSTER_TYPE" -b $(EXTRA_ARGS)
 
 # ============================================================================
 # 卸载操作
@@ -121,6 +163,12 @@ verify-uninstall: ## 验证卸载是否完全清理
 	@ansible -i $(INVENTORY) all -m script -a "scripts/verify-uninstall.sh" -b || \
 		echo "$(RED)发现残留文件或进程，请检查日志$(NC)"
 
+cleanup-systemd: ## 清理残留的 systemd 服务文件
+	@echo "$(BLUE)清理残留的 systemd 服务文件...$(NC)"
+	ANSIBLE_ROLES_PATH=$(ANSIBLE_ROLES_PATH) ansible-playbook -i $(INVENTORY) $(PLAYBOOK_DIR)/cleanup-systemd.yml $(EXTRA_ARGS)
+	@echo "$(GREEN)✓ systemd 清理完成$(NC)"
+	@echo "$(YELLOW)提示: 运行 'make verify-uninstall' 验证清理结果$(NC)"
+
 # ============================================================================
 # 检查和测试
 # ============================================================================
@@ -135,11 +183,11 @@ status: ## 获取集群状态
 	@echo "$(BLUE)获取集群状态...$(NC)"
 	@CLUSTER_TYPE=$$(grep "^cluster_type=" $(INVENTORY) | head -1 | cut -d'=' -f2 || echo "rke2"); \
 	if [ "$$CLUSTER_TYPE" = "k3s" ]; then \
-		ansible -i $(INVENTORY) rke_k3s_servers[0] -m shell \
+		ansible -i $(INVENTORY) rke_servers[0] -m shell \
 			-a "export KUBECONFIG=/etc/rancher/k3s/k3s.yaml && /usr/local/bin/kubectl get nodes -o wide" -b 2>/dev/null || \
 			echo "$(YELLOW)无法获取状态$(NC)"; \
 	else \
-		ansible -i $(INVENTORY) rke_k3s_servers[0] -m shell \
+		ansible -i $(INVENTORY) rke_servers[0] -m shell \
 			-a "export KUBECONFIG=/etc/rancher/rke2/rke2.yaml && /var/lib/rancher/rke2/bin/kubectl get nodes -o wide" -b 2>/dev/null || \
 			echo "$(YELLOW)无法获取状态$(NC)"; \
 	fi
@@ -148,10 +196,10 @@ pods: ## 查看所有 Pod
 	@echo "$(BLUE)查看所有 Pod...$(NC)"
 	@CLUSTER_TYPE=$$(grep "^cluster_type=" $(INVENTORY) | head -1 | cut -d'=' -f2 || echo "rke2"); \
 	if [ "$$CLUSTER_TYPE" = "k3s" ]; then \
-		ansible -i $(INVENTORY) rke_k3s_servers[0] -m shell \
+		ansible -i $(INVENTORY) rke_servers[0] -m shell \
 			-a "export KUBECONFIG=/etc/rancher/k3s/k3s.yaml && /usr/local/bin/kubectl get pods -A" -b 2>/dev/null; \
 	else \
-		ansible -i $(INVENTORY) rke_k3s_servers[0] -m shell \
+		ansible -i $(INVENTORY) rke_servers[0] -m shell \
 			-a "export KUBECONFIG=/etc/rancher/rke2/rke2.yaml && /var/lib/rancher/rke2/bin/kubectl get pods -A" -b 2>/dev/null; \
 	fi
 
@@ -237,18 +285,17 @@ setup: ## 初始化配置文件 (用法: make setup [k3s|rke2])
 		if [ "$$CLUSTER_TYPE" = "k3s" ]; then \
 			sed -i.bak 's/cluster_type=rke2/cluster_type=k3s/g' inventory/hosts.ini && rm -f inventory/hosts.ini.bak; \
 			sed -i.bak 's/cluster_type: "rke2"/cluster_type: "k3s"/g' inventory/group_vars/all.yml && rm -f inventory/group_vars/all.yml.bak; \
-			sed -i.bak 's|server_url: ""|server_url: "https://FIRST_NODE_IP:6443"|g' inventory/group_vars/all.yml && rm -f inventory/group_vars/all.yml.bak; \
 			echo "$(GREEN)✓ 集群类型设置为: K3S$(NC)"; \
-			echo "$(GREEN)✓ API Server 端口: 6443$(NC)"; \
+			echo "$(GREEN)✓ API Server 端口: 6443 (自动获取)$(NC)"; \
 		else \
 			sed -i.bak 's/cluster_type=k3s/cluster_type=rke2/g' inventory/hosts.ini && rm -f inventory/hosts.ini.bak; \
 			sed -i.bak 's/cluster_type: "k3s"/cluster_type: "rke2"/g' inventory/group_vars/all.yml && rm -f inventory/group_vars/all.yml.bak; \
-			sed -i.bak 's|server_url: ""|server_url: "https://FIRST_NODE_IP:9345"|g' inventory/group_vars/all.yml && rm -f inventory/group_vars/all.yml.bak; \
 			echo "$(GREEN)✓ 集群类型设置为: RKE2$(NC)"; \
-			echo "$(GREEN)✓ API Server 端口: 9345$(NC)"; \
+			echo "$(GREEN)✓ API Server 端口: 9345 (自动获取)$(NC)"; \
 		fi; \
 		sed -i.bak 's/china_region: false/china_region: true/g' inventory/group_vars/all.yml && rm -f inventory/group_vars/all.yml.bak; \
 		echo "$(GREEN)✓ 中国镜像源: 已启用$(NC)"; \
+		echo "$(GREEN)✓ Server URL: 自动从初始节点获取$(NC)"; \
 		echo ""; \
 	fi; \
 	echo "$(GREEN)========================================$(NC)"; \
@@ -268,15 +315,47 @@ setup: ## 初始化配置文件 (用法: make setup [k3s|rke2])
 	@echo "    • ansible_user          - SSH 登录用户名"
 	@echo "    • ansible_ssh_private_key_file - SSH 私钥路径"
 	@echo ""
-	@echo "  示例："
-	@echo "    $(GREEN)[rke_k3s_servers]$(NC)"
-	@echo "    $(GREEN)node1 ansible_host=192.168.1.10 cluster_init=true$(NC)"
-	@echo "    $(GREEN)node2 ansible_host=192.168.1.11$(NC)"
-	@echo "    $(GREEN)node3 ansible_host=192.168.1.12$(NC)"
-	@echo ""
-	@echo "    $(GREEN)[all:vars]$(NC)"
-	@echo "    $(GREEN)ansible_user=root$(NC)"
-	@echo "    $(GREEN)ansible_ssh_private_key_file=~/.ssh/id_rsa$(NC)"
+	@if grep -q "cluster_type=k3s\|cluster_type: \"k3s\"" inventory/hosts.ini inventory/group_vars/all.yml 2>/dev/null; then \
+		echo "  $(CYAN)K3S 集群配置示例:$(NC)"; \
+		echo "    $(GREEN)[rke_servers]$(NC)"; \
+		echo "    $(GREEN)node1 ansible_host=192.168.1.10 cluster_init=true$(NC)"; \
+		echo "    $(GREEN)node2 ansible_host=192.168.1.11$(NC)"; \
+		echo "    $(GREEN)node3 ansible_host=192.168.1.12$(NC)"; \
+		echo ""; \
+		echo "    $(GREEN)[rke_agents]$(NC)"; \
+		echo "    $(GREEN)worker1 ansible_host=192.168.1.20$(NC)"; \
+		echo ""; \
+		echo "    $(GREEN)[all:vars]$(NC)"; \
+		echo "    $(GREEN)ansible_user=root$(NC)"; \
+		echo "    $(GREEN)ansible_ssh_private_key_file=~/.ssh/id_rsa$(NC)"; \
+		echo "    $(GREEN)cluster_type=k3s$(NC)"; \
+		echo "    $(YELLOW)# server_url 留空，自动从初始节点获取 (6443 端口)$(NC)"; \
+	elif grep -q "cluster_type=rke2\|cluster_type: \"rke2\"" inventory/hosts.ini inventory/group_vars/all.yml 2>/dev/null; then \
+		echo "  $(CYAN)RKE2 集群配置示例:$(NC)"; \
+		echo "    $(GREEN)[rke_servers]$(NC)"; \
+		echo "    $(GREEN)node1 ansible_host=192.168.1.10 cluster_init=true$(NC)"; \
+		echo "    $(GREEN)node2 ansible_host=192.168.1.11$(NC)"; \
+		echo "    $(GREEN)node3 ansible_host=192.168.1.12$(NC)"; \
+		echo ""; \
+		echo "    $(GREEN)[rke_agents]$(NC)"; \
+		echo "    $(GREEN)worker1 ansible_host=192.168.1.20$(NC)"; \
+		echo ""; \
+		echo "    $(GREEN)[all:vars]$(NC)"; \
+		echo "    $(GREEN)ansible_user=root$(NC)"; \
+		echo "    $(GREEN)ansible_ssh_private_key_file=~/.ssh/id_rsa$(NC)"; \
+		echo "    $(GREEN)cluster_type=rke2$(NC)"; \
+		echo "    $(YELLOW)# server_url 留空，自动从初始节点获取 (9345 端口)$(NC)"; \
+	else \
+		echo "  示例:"; \
+		echo "    $(GREEN)[rke_servers]$(NC)"; \
+		echo "    $(GREEN)node1 ansible_host=192.168.1.10 cluster_init=true$(NC)"; \
+		echo "    $(GREEN)node2 ansible_host=192.168.1.11$(NC)"; \
+		echo "    $(GREEN)node3 ansible_host=192.168.1.12$(NC)"; \
+		echo ""; \
+		echo "    $(GREEN)[all:vars]$(NC)"; \
+		echo "    $(GREEN)ansible_user=root$(NC)"; \
+		echo "    $(GREEN)ansible_ssh_private_key_file=~/.ssh/id_rsa$(NC)"; \
+	fi
 	@echo ""
 	@echo "$(BLUE)━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━$(NC)"
 	@echo "$(BLUE)2️⃣  基础配置 (推荐)$(NC)"
@@ -284,24 +363,33 @@ setup: ## 初始化配置文件 (用法: make setup [k3s|rke2])
 	@echo ""
 	@echo "  文件: $(YELLOW)inventory/hosts.ini$(NC) 或 $(YELLOW)inventory/group_vars/all.yml$(NC)"
 	@echo ""
-	@echo "  • $(CYAN)cluster_type$(NC)    - 集群类型"
-	@echo "      rke2  (默认，适合生产环境)"
-	@echo "      k3s   (轻量级，适合边缘计算/开发环境)"
+	@echo "  • $(CYAN)cluster_type$(NC)    - 集群类型 $(YELLOW)*重要*$(NC)"
+	@echo "      $(GREEN)rke2$(NC)  - 企业级 K8s (默认)"
+	@echo "              ├─ 适合生产环境、合规要求高的场景"
+	@echo "              ├─ FIPS 140-2 认证、SELinux 支持"
+	@echo "              └─ API Server 端口: $(YELLOW)9345$(NC)"
+	@echo "      $(GREEN)k3s$(NC)   - 轻量级 K8s"
+	@echo "              ├─ 适合边缘计算、IoT、开发测试"
+	@echo "              ├─ 内存占用低 (< 512MB)"
+	@echo "              └─ API Server 端口: $(YELLOW)6443$(NC)"
 	@echo ""
 	@echo "  • $(CYAN)install_version$(NC) - 安装版本 (留空安装最新稳定版)"
-	@echo "      示例: v1.33.5+rke2r1"
-	@echo "      示例: v1.33.5+k3s1"
+	@echo "      RKE2 示例: $(GREEN)v1.33.5+rke2r1$(NC)"
+	@echo "      K3S  示例: $(GREEN)v1.33.5+k3s1$(NC)"
 	@echo ""
 	@echo "  • $(CYAN)china_region$(NC)    - 中国大陆镜像加速"
-	@echo "      true  (启用，大幅提升下载速度)"
+	@echo "      $(GREEN)true$(NC)  (启用，大幅提升下载速度)"
 	@echo "      false (禁用，使用官方源)"
 	@echo ""
 	@echo "  • $(CYAN)cluster_token$(NC)   - 集群共享密钥"
-	@echo "      建议: 使用强密码或自动生成的 Token"
+	@echo "      留空: 自动从初始节点获取 $(YELLOW)(推荐)$(NC)"
+	@echo "      手动: 使用 ansible-vault 加密后配置"
 	@echo ""
-	@echo "  • $(CYAN)server_url$(NC)      - API Server 地址 (HA 模式)"
-	@echo "      RKE2: https://首节点IP:9345"
-	@echo "      K3S:  https://首节点IP:6443"
+	@echo "  • $(CYAN)server_url$(NC)      - API Server 地址 $(YELLOW)(自动获取)$(NC)"
+	@echo "      留空: 自动从初始 Server 节点获取 $(YELLOW)(推荐)$(NC)"
+	@echo "      $(GREEN)RKE2$(NC): 自动使用 https://初始节点IP:$(YELLOW)9345$(NC)"
+	@echo "      $(GREEN)K3S$(NC):  自动使用 https://初始节点IP:$(YELLOW)6443$(NC)"
+	@echo "      手动: 使用负载均衡器时需手动配置"
 	@echo ""
 	@echo "$(BLUE)━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━$(NC)"
 	@echo "$(BLUE)3️⃣  高级配置 (可选)$(NC)"
@@ -399,10 +487,10 @@ info: ## 显示集群信息
 	@echo "Inventory: $(INVENTORY)"
 	@echo ""
 	@echo "$(GREEN)Server 节点:$(NC)"
-	@ansible -i $(INVENTORY) rke_k3s_servers --list-hosts 2>/dev/null || echo "  未配置"
+	@ansible -i $(INVENTORY) rke_servers --list-hosts 2>/dev/null || echo "  未配置"
 	@echo ""
 	@echo "$(GREEN)Agent 节点:$(NC)"
-	@ansible -i $(INVENTORY) rke_k3s_agents --list-hosts 2>/dev/null || echo "  未配置"
+	@ansible -i $(INVENTORY) rke_agents --list-hosts 2>/dev/null || echo "  未配置"
 	@echo "$(BLUE)========================================$(NC)"
 
 version: ## 显示已安装版本
@@ -419,10 +507,10 @@ logs: ## 查看服务日志
 	@echo "$(YELLOW)Server 节点日志:$(NC)"
 	@CLUSTER_TYPE=$$(grep "^cluster_type=" $(INVENTORY) | head -1 | cut -d'=' -f2 || echo "rke2"); \
 	if [ "$$CLUSTER_TYPE" = "k3s" ]; then \
-		ansible -i $(INVENTORY) rke_k3s_servers[0] -m shell -a "journalctl -u k3s -n 50 --no-pager" -b 2>/dev/null || \
+		ansible -i $(INVENTORY) rke_servers[0] -m shell -a "journalctl -u k3s -n 50 --no-pager" -b 2>/dev/null || \
 			echo "$(YELLOW)无法获取日志$(NC)"; \
 	else \
-		ansible -i $(INVENTORY) rke_k3s_servers[0] -m shell -a "journalctl -u rke2-server -n 50 --no-pager" -b 2>/dev/null || \
+		ansible -i $(INVENTORY) rke_servers[0] -m shell -a "journalctl -u rke2-server -n 50 --no-pager" -b 2>/dev/null || \
 			echo "$(YELLOW)无法获取日志$(NC)"; \
 	fi
 

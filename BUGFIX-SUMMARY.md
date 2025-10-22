@@ -173,9 +173,9 @@ make uninstall   # 卸载测试（需确认）
 ```makefile
 status: ## 获取集群状态
 	@echo "$(BLUE)获取集群状态...$(NC)"
-	@ansible -i $(INVENTORY) rke_k3s_servers[0] -m shell \
+	@ansible -i $(INVENTORY) rke_servers[0] -m shell \
 		-a "export KUBECONFIG=/etc/rancher/rke2/rke2.yaml && /var/lib/rancher/rke2/bin/kubectl get nodes -o wide" -b || \
-		ansible -i $(INVENTORY) rke_k3s_servers[0] -m shell \
+		ansible -i $(INVENTORY) rke_servers[0] -m shell \
 		-a "export KUBECONFIG=/etc/rancher/k3s/k3s.yaml && /usr/local/bin/kubectl get nodes -o wide" -b || \
 		echo "$(YELLOW)无法获取状态$(NC)"
 ```
@@ -184,9 +184,9 @@ status: ## 获取集群状态
 ```makefile
 pods: ## 查看所有 Pod
 	@echo "$(BLUE)查看所有 Pod...$(NC)"
-	@ansible -i $(INVENTORY) rke_k3s_servers[0] -m shell \
+	@ansible -i $(INVENTORY) rke_servers[0] -m shell \
 		-a "export KUBECONFIG=/etc/rancher/rke2/rke2.yaml && /var/lib/rancher/rke2/bin/kubectl get pods -A" -b || \
-		ansible -i $(INVENTORY) rke_k3s_servers[0] -m shell \
+		ansible -i $(INVENTORY) rke_servers[0] -m shell \
 		-a "export KUBECONFIG=/etc/rancher/k3s/k3s.yaml && /usr/local/bin/kubectl get pods -A" -b
 ```
 
@@ -203,7 +203,7 @@ version: ## 显示已安装版本
 logs: ## 查看服务日志
 	@echo "$(BLUE)查看服务日志...$(NC)"
 	@echo "$(YELLOW)Server 节点日志:$(NC)"
-	@ansible -i $(INVENTORY) rke_k3s_servers[0] -m shell \
+	@ansible -i $(INVENTORY) rke_servers[0] -m shell \
 		-a "journalctl -u rke2-server -n 50 --no-pager 2>/dev/null || journalctl -u k3s -n 50 --no-pager" -b || \
 		echo "$(YELLOW)无法获取日志$(NC)"
 ```
