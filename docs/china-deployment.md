@@ -552,4 +552,4 @@ ctr --namespace k8s.io images pull docker.io/library/nginx:latest
 ---
 
 **文档版本**: 1.0.0  
-**最后更新**: 2025-01-05
+**最后更新**: 2025-10-22

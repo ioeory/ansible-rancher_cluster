@@ -1,23 +1,44 @@
-# RKE2/K3S Ansible Role
+# RKE2/K3S Ansible Role (Rancher Cluster)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Ansible](https://img.shields.io/badge/Ansible-2.14%2B-green.svg)](https://www.ansible.com/)
 [![RKE2](https://img.shields.io/badge/RKE2-Latest-orange.svg)](https://docs.rke2.io/)
 [![K3S](https://img.shields.io/badge/K3S-Latest-blue.svg)](https://k3s.io/)
+[![Role](https://img.shields.io/badge/Role-rancher__cluster-success.svg)](roles/rancher_cluster)
 
-专业的生产级 Ansible Role，用于自动化部署和管理 RKE2 和 K3S Kubernetes 集群。
+**专业的生产级 Ansible Role，用于自动化部署和管理 RKE2 和 K3S Kubernetes 集群。**
 
-## ✨ 特性
+> 📢 **最近更新 (2025-10-22)**  
+> - ✅ Role 重构完成：`rke_k3s` → `rancher_cluster`  
+> - ✅ 全面国际化：所有任务名称翻译为英文  
+> - ✅ 文档重组：新增双语命令参考手册  
+> - ✅ 代码优化：提升可维护性和专业性
 
+## ✨ 核心特性
+
+### 🎯 集群管理
 - 🔄 **统一管理**: 单一 Role 同时支持 RKE2 和 K3S
 - 🏗️ **高可用架构**: 支持多 Master 节点 HA 集群部署
-- 🇨🇳 **中国优化**: 针对中国大陆网络环境优化，支持镜像加速
-- 🔐 **安全最佳实践**: Token 加密、TLS 配置、CIS 强化模式
-- 📦 **多系统支持**: Debian 12+、Ubuntu 22.04+、OpenAnolis 8+
-- 🏭 **架构兼容**: AMD64 和 ARM64 双架构支持
-- 🔧 **灵活配置**: 丰富的参数化配置选项
 - 🔄 **生命周期管理**: 安装、升级、备份、卸载全流程支持
-- 🚀 **快速部署**: Makefile 快捷命令，3 分钟完成安装
+- 🚀 **快速部署**: 自动化命令，3 分钟完成安装
+- 🔧 **灵活配置**: 丰富的参数化配置选项
+
+### 🌍 国际化与本地化
+- 🌐 **双语支持**: 完整的中英文双语文档
+- 🇨🇳 **中国优化**: 镜像加速、网络优化，大幅提升部署速度
+- 📚 **专业文档**: 详细的命令参考、架构说明、故障排查
+
+### 🔐 企业级特性
+- 🔒 **安全最佳实践**: Token 自动管理、TLS 配置、CIS 强化模式
+- 📦 **多系统支持**: Debian 12+、Ubuntu 22.04+、OpenAnolis 8+、RHEL 8+
+- 🏭 **架构兼容**: AMD64 和 ARM64 双架构支持
+- 🎛️ **智能升级**: 滚动升级、中断恢复、强制重装
+
+### 💡 最新改进 (v2.0)
+- ✅ **Role 重命名**: `rancher_cluster` 更清晰的命名
+- ✅ **代码国际化**: 所有任务名称使用英文
+- ✅ **文档优化**: 新增命令参考手册
+- ✅ **结构优化**: 更好的文件组织和可维护性
 
 ## 📋 目录
 
@@ -387,10 +408,12 @@ make logs              # 查看日志
 
 ## 📚 文档
 
+- [命令参考](docs/COMMANDS-REFERENCE.md) - 完整的 Makefile 命令参考
 - [安装部署指南](docs/installation-guide.md) - 详细安装步骤和配置说明
 - [架构设计文档](docs/architecture.md) - 架构设计和技术原理
 - [中国大陆部署指南](docs/china-deployment.md) - 中国网络环境特殊配置
 - [故障排查指南](docs/troubleshooting.md) - 常见问题和解决方案
+- [RKE2 vs K3S 对比](docs/RKE2-VS-K3S.md) - 两种方案的对比和选择指南
 
 ## 🔍 故障排查
 
@@ -485,12 +508,8 @@ INVENTORY=inventory/test.ini make install
 
 ## 📧 联系方式
 
-- 项目主页: [GitHub Repository](https://github.com/your-org/rke2-k3s-ansible)
-- 问题反馈: [Issue Tracker](https://github.com/your-org/rke2-k3s-ansible/issues)
-- 邮件: devops@example.com
+- 项目主页: [GitHub Repository](https://github.com/ioeory/ansible-rancher_cluster)
+- 问题反馈: [Issue Tracker](https://github.com/ioeory/ansible-rancher_cluster/issues)
+- 邮件: ioeory@gmail.com
 
 ---
-
-**作者**: DevOps Team  
-**版本**: 1.0.0  
-**最后更新**: 2025-01-05

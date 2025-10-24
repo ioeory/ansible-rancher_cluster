@@ -1,23 +1,44 @@
-# RKE2/K3S Ansible Role
+# RKE2/K3S Ansible Role (Rancher Cluster)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Ansible](https://img.shields.io/badge/Ansible-2.14%2B-green.svg)](https://www.ansible.com/)
 [![RKE2](https://img.shields.io/badge/RKE2-Latest-orange.svg)](https://docs.rke2.io/)
 [![K3S](https://img.shields.io/badge/K3S-Latest-blue.svg)](https://k3s.io/)
+[![Role](https://img.shields.io/badge/Role-rancher__cluster-success.svg)](roles/rancher_cluster)
 
-Professional production-grade Ansible Role for automated deployment and management of RKE2 and K3S Kubernetes clusters.
+**Professional production-grade Ansible Role for automated deployment and management of RKE2 and K3S Kubernetes clusters.**
 
-## ✨ Features
+> 📢 **Recent Updates (2025-10-22)**  
+> - ✅ Role refactored: `rke_k3s` → `rancher_cluster`  
+> - ✅ Full internationalization: All task names translated to English  
+> - ✅ Documentation reorganized: New bilingual commands reference  
+> - ✅ Code optimization: Improved maintainability and professionalism
 
+## ✨ Core Features
+
+### 🎯 Cluster Management
 - 🔄 **Unified Management**: Single role supports both RKE2 and K3S
 - 🏗️ **High Availability**: Multi-master node HA cluster deployment
-- 🇨🇳 **China Optimized**: Network optimizations for mainland China with mirror acceleration
-- 🔐 **Security Best Practices**: Token encryption, TLS configuration, CIS hardening mode
-- 📦 **Multi-OS Support**: Debian 12+, Ubuntu 22.04+, OpenAnolis 8+
-- 🏭 **Architecture Compatible**: AMD64 and ARM64 dual architecture support
-- 🔧 **Flexible Configuration**: Rich parameterized configuration options
 - 🔄 **Lifecycle Management**: Full support for install, upgrade, backup, and uninstall
-- 🚀 **Quick Deployment**: Makefile shortcuts, complete installation in 3 minutes
+- 🚀 **Quick Deployment**: Automated commands, complete installation in 3 minutes
+- 🔧 **Flexible Configuration**: Rich parameterized configuration options
+
+### 🌍 Internationalization & Localization
+- 🌐 **Bilingual Support**: Complete Chinese/English bilingual documentation
+- 🇨🇳 **China Optimized**: Mirror acceleration and network optimization for fast deployment
+- 📚 **Professional Docs**: Detailed command reference, architecture guide, troubleshooting
+
+### 🔐 Enterprise Features
+- 🔒 **Security Best Practices**: Automatic token management, TLS configuration, CIS hardening
+- 📦 **Multi-OS Support**: Debian 12+, Ubuntu 22.04+, OpenAnolis 8+, RHEL 8+
+- 🏭 **Architecture Compatible**: AMD64 and ARM64 dual architecture support
+- 🎛️ **Smart Upgrade**: Rolling upgrade, resume from interruption, force reinstall
+
+### 💡 Latest Improvements (v2.0)
+- ✅ **Role Renamed**: `rancher_cluster` for clearer naming
+- ✅ **Code Internationalization**: All task names in English
+- ✅ **Documentation Enhanced**: New commands reference manual
+- ✅ **Structure Optimized**: Better file organization and maintainability
 
 ## 📋 Table of Contents
 
@@ -451,6 +472,7 @@ For more details see [China Deployment Guide](docs/china-deployment.md)
 
 ## 📚 Documentation
 
+- [Commands Reference](docs/COMMANDS-REFERENCE.md) - Complete Makefile commands reference
 - [Quick Start Guide](docs/QUICK-START-GUIDE.md) - Complete quick deployment guide
 - [Installation Guide](docs/installation-guide.md) - Detailed installation steps
 - [Architecture Guide](docs/architecture.md) - System architecture explanation
@@ -551,13 +573,6 @@ This project is licensed under the MIT License. See [LICENSE](LICENSE) file for 
 
 ## 📧 Contact
 
-- Project Homepage: [GitHub Repository](https://github.com/your-org/rke2-k3s-ansible)
-- Issue Tracker: [Issue Tracker](https://github.com/your-org/rke2-k3s-ansible/issues)
-- Email: devops@example.com
-
----
-
-**Author**: DevOps Team  
-**Version**: 1.0.0  
-**Last Updated**: 2025-01-05
-
+- Project Homepage: [GitHub Repository](https://github.com/ioeory/ansible-rancher_cluster)
+- Issue Tracker: [Issue Tracker](https://github.com/ioeory/ansible-rancher_cluster/issues)
+- Email: ioeory@gmail.com

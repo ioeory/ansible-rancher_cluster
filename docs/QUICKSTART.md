@@ -136,8 +136,7 @@ cat /tmp/rke2-token.txt
 ## 🆘 获取帮助
 
 - 📖 [完整文档](README.md)
-- 🐛 [报告问题](https://github.com/your-org/rke2-k3s-ansible/issues)
-- 💬 [讨论区](https://github.com/your-org/rke2-k3s-ansible/discussions)
+- 🐛 [报告问题](https://github.com/ioeory/ansible-rancher_cluster/issues)
 
 ---
 

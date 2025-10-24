@@ -1,58 +1,58 @@
 ---
-# RKE2/K3S 卸载 Playbook
-# 用途：完全卸载 RKE2 或 K3S 集群
-# 警告：此操作将删除所有数据，请谨慎使用！
+# RKE2/K3S Uninstall Playbook
+# Purpose: Completely uninstall RKE2 or K3S cluster
+# Warning: This operation will delete all data, use with caution!
 
-- name: 卸载 RKE2/K3S 集群
+- name: Uninstall RKE2/K3S cluster
   hosts: all
   become: yes
   gather_facts: yes
 
   vars_prompt:
     - name: confirm_uninstall
-      prompt: "确认卸载集群？所有数据将被删除！(yes/no)"
+      prompt: "Confirm cluster uninstallation? All data will be deleted! (yes/no)"
       private: no
 
   pre_tasks:
-    - name: 加载集群类型变量
+    - name: Load cluster type variables
       set_fact:
         cluster_type: "{{ cluster_type | default('rke2') }}"
       run_once: yes
-    - name: 验证确认
+    - name: Verify confirmation
       assert:
         that:
           - confirm_uninstall == 'yes'
-        fail_msg: "卸载操作已取消"
+        fail_msg: "Uninstall operation cancelled"
       run_once: yes
 
-    - name: 显示卸载警告
+    - name: Display uninstall warning
       debug:
         msg:
           - "=========================================="
-          - "⚠️  警告：开始卸载 {{ cluster_type | upper }}"
-          - "主机: {{ inventory_hostname }}"
-          - "所有数据将被永久删除！"
+          - "⚠️  Warning: Starting {{ cluster_type | upper }} uninstallation"
+          - "Host: {{ inventory_hostname }}"
+          - "All data will be permanently deleted!"
           - "=========================================="
 
   tasks:
-    - name: 加载集群类型变量
+    - name: Load cluster type variables
       include_vars: "../roles/rancher_cluster/vars/{{ cluster_type }}.yml"
 
-    - name: 停止服务
+    - name: Stop service
       systemd:
         name: "{{ service_name }}"
         state: stopped
         enabled: no
       ignore_errors: yes
 
-    - name: 执行卸载脚本 (RKE2)
+    - name: Execute uninstall script (RKE2)
       shell: |
         /usr/local/bin/rke2-uninstall.sh
       when:
         - cluster_type == 'rke2'
       ignore_errors: yes
 
-    - name: 执行卸载脚本 (K3S Server)
+    - name: Execute uninstall script (K3S Server)
       shell: |
         /usr/local/bin/k3s-uninstall.sh
       when:
@@ -60,7 +60,7 @@
         - node_role == 'server'
       ignore_errors: yes
 
-    - name: 执行卸载脚本 (K3S Agent)
+    - name: Execute uninstall script (K3S Agent)
       shell: |
         /usr/local/bin/k3s-agent-uninstall.sh
       when:
@@ -68,7 +68,7 @@
         - node_role == 'agent'
       ignore_errors: yes
 
-    - name: 删除集群特定目录
+    - name: Remove cluster-specific directories
       file:
         path: "{{ item }}"
         state: absent
@@ -82,7 +82,7 @@
         - "/run/k8s"
       ignore_errors: yes
 
-    - name: 删除 Rancher 父目录（完全清理）
+    - name: Remove Rancher parent directories (complete cleanup)
       file:
         path: "{{ item }}"
         state: absent
@@ -91,33 +91,33 @@
         - "/var/lib/rancher"
       ignore_errors: yes
 
-    - name: 清理 iptables 规则
+    - name: Clean iptables rules
       shell: |
         iptables-save | grep -v {{ cluster_type | upper }} | iptables-restore
         ip6tables-save | grep -v {{ cluster_type | upper }} | ip6tables-restore
       ignore_errors: yes
 
-    - name: 删除网络接口
+    - name: Remove network interfaces
       shell: |
         ip link delete cni0 2>/dev/null || true
         ip link delete flannel.1 2>/dev/null || true
         ip link delete kube-ipvs0 2>/dev/null || true
       ignore_errors: yes
 
-    - name: 清理环境变量配置
+    - name: Clean environment variable configuration
       blockinfile:
         path: "/root/.bashrc"
         state: absent
         marker: "# {mark} ANSIBLE MANAGED BLOCK - {{ cluster_type | upper }}"
       ignore_errors: yes
 
-    - name: 删除 kubectl 符号链接
+    - name: Remove kubectl symlink
       file:
         path: /usr/local/bin/kubectl
         state: absent
       ignore_errors: yes
 
-    - name: 删除卸载脚本和二进制文件
+    - name: Remove uninstall scripts and binaries
       file:
         path: "{{ item }}"
         state: absent
@@ -131,7 +131,7 @@
         - "/usr/bin/k3s"
       ignore_errors: yes
 
-    - name: 删除 systemd 服务文件
+    - name: Remove systemd service files
       file:
         path: "{{ item }}"
         state: absent
@@ -150,29 +150,29 @@
         - "/usr/local/lib/systemd/system/k3s-agent.service"
       ignore_errors: yes
 
-    - name: 重新加载 systemd
+    - name: Reload systemd
       systemd:
         daemon_reload: yes
       ignore_errors: yes
 
   post_tasks:
-    - name: 卸载完成提示
+    - name: Uninstall completion notification
       debug:
         msg:
           - "=========================================="
-          - "✓ {{ cluster_type | upper }} 卸载完成"
+          - "✓ {{ cluster_type | upper }} uninstallation completed"
           - ""
-          - "已清理："
-          - "  ✓ 服务和进程"
-          - "  ✓ 配置文件和目录"
-          - "  ✓ 数据目录（包括 /etc/rancher 和 /var/lib/rancher）"
-          - "  ✓ 网络接口和规则"
-          - "  ✓ 二进制文件和卸载脚本"
-          - "  ✓ Systemd 服务文件"
-          - "  ✓ CNI 配置和插件"
+          - "Cleaned up:"
+          - "  ✓ Services and processes"
+          - "  ✓ Configuration files and directories"
+          - "  ✓ Data directories (including /etc/rancher and /var/lib/rancher)"
+          - "  ✓ Network interfaces and rules"
+          - "  ✓ Binary files and uninstall scripts"
+          - "  ✓ Systemd service files"
+          - "  ✓ CNI configuration and plugins"
           - ""
-          - "建议执行："
-          - "  1. 重启系统以确保完全清理: sudo reboot"
-          - "  2. 检查残留进程: ps aux | grep -E '(rke2|k3s)'"
-          - "  3. 检查残留挂载: mount | grep -E '(rke2|k3s)'"
+          - "Recommended actions:"
+          - "  1. Reboot system to ensure complete cleanup: sudo reboot"
+          - "  2. Check for residual processes: ps aux | grep -E '(rke2|k3s)'"
+          - "  3. Check for residual mounts: mount | grep -E '(rke2|k3s)'"
           - "=========================================="

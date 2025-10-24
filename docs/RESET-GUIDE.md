@@ -376,7 +376,6 @@ vim inventory/group_vars/all.yml
 ---
 
 **文档版本**: v1.0  
-**最后更新**: 2025-10-20  
-**维护者**: RKE2/K3S Ansible Automation Project
+**最后更新**: 2025-10-22  
 
 

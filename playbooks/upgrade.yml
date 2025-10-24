@@ -1,104 +1,104 @@
 ---
-# RKE2/K3S 升级 Playbook
-# 用途：滚动升级 RKE2 或 K3S 集群
+# RKE2/K3S Upgrade Playbook
+# Purpose: Rolling upgrade of RKE2 or K3S cluster
 
-- name: 升级 Server 节点
+- name: Upgrade Server nodes
   hosts: rke_servers
   become: yes
   gather_facts: yes
-  serial: 1  # 每次升级一个 Server，确保高可用
+  serial: 1  # Upgrade one Server at a time to ensure high availability
 
   pre_tasks:
-    - name: 设置全局升级确认标志
+    - name: Set global upgrade confirmation flag
       set_fact:
         upgrade_confirmed: true
       run_once: yes
       delegate_to: localhost
       delegate_facts: yes
-    - name: 显示升级信息
+    - name: Display upgrade information
       debug:
         msg:
           - "=========================================="
-          - "开始升级 Server 节点: {{ inventory_hostname }}"
-          - "目标版本: {{ install_version | default('最新版本', true) }}"
+          - "Starting Server node upgrade: {{ inventory_hostname }}"
+          - "Target version: {{ install_version | default('Latest version', true) }}"
           - "=========================================="
 
   roles:
     - role: rancher_cluster
 
   tasks:
-    - name: 加载集群类型特定变量
+    - name: Load cluster-specific variables
       include_vars: "../roles/rancher_cluster/vars/{{ cluster_type }}.yml"
 
-    - name: 设置升级标志
+    - name: Set upgrade flag
       set_fact:
         upgrade_cluster: true
 
-    - name: 执行升级
+    - name: Execute upgrade
       include_role:
         name: rancher_cluster
         tasks_from: upgrade
 
   post_tasks:
-    - name: 等待节点稳定
+    - name: Wait for node to stabilize
       pause:
         seconds: 30
-        prompt: "等待 Server 节点稳定后继续..."
+        prompt: "Waiting for Server node to stabilize before continuing..."
 
-- name: 升级 Agent 节点
+- name: Upgrade Agent nodes
   hosts: rke_agents
   become: yes
   gather_facts: yes
-  serial: "80%"  # 每次并行升级 30% 的 Agent 节点（最少1个）
+  serial: "80%"  # Upgrade 80% of Agent nodes in parallel each time (minimum 1)
 
   pre_tasks:
-    - name: 设置 Agent 跳过确认
+    - name: Set Agent skip confirmation
       set_fact:
         skip_upgrade_confirmation: true
-    - name: 显示升级信息
+    - name: Display upgrade information
       debug:
         msg:
           - "=========================================="
-          - "开始升级 Agent 节点: {{ inventory_hostname }}"
+          - "Starting Agent node upgrade: {{ inventory_hostname }}"
           - "=========================================="
 
   tasks:
-    - name: 加载集群类型特定变量
+    - name: Load cluster-specific variables
       include_vars: "../roles/rancher_cluster/vars/{{ cluster_type }}.yml"
 
-    - name: 设置升级标志
+    - name: Set upgrade flag
       set_fact:
         upgrade_cluster: true
 
-    - name: 执行升级
+    - name: Execute upgrade
       include_role:
         name: rancher_cluster
         tasks_from: upgrade
 
   post_tasks:
-    - name: 等待节点稳定
+    - name: Wait for node to stabilize
       pause:
         seconds: 15
 
-- name: 升级完成验证
+- name: Upgrade completion verification
   hosts: rke_servers[0]
   become: yes
   gather_facts: no
 
   tasks:
-    - name: 验证所有节点状态
+    - name: Verify all node status
       shell: |
         export KUBECONFIG=/etc/rancher/{{ cluster_type }}/{{ cluster_type }}.yaml
         kubectl get nodes
       register: final_status
       changed_when: false
 
-    - name: 显示最终状态
+    - name: Display final status
       debug:
         msg:
           - "=========================================="
-          - "✓ 集群升级完成"
+          - "✓ Cluster upgrade completed"
           - ""
-          - "节点状态："
+          - "Node status:"
           - "{{ final_status.stdout_lines | join('\n') }}"
           - "=========================================="

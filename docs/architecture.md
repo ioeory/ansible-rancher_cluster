@@ -534,4 +534,4 @@ K3S:  /var/lib/rancher/k3s/agent/containerd/io.containerd.content.v1.content/
 ---
 
 **文档版本**: 1.0.0  
-**最后更新**: 2025-01-05
+**最后更新**: 2025-10-22
